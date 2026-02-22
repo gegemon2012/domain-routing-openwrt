@@ -759,6 +759,13 @@ add_internal_wg() {
         read -r -p "Enter H2 value (from [Interface]):"$'\n' AWG_H2
         read -r -p "Enter H3 value (from [Interface]):"$'\n' AWG_H3
         read -r -p "Enter H4 value (from [Interface]):"$'\n' AWG_H4
+        read -r -p "Enter S3 value (from [Interface]):"$'\n' AWG_S3
+        read -r -p "Enter S4 value (from [Interface]):"$'\n' AWG_S4
+        read -r -p "Enter I1 value (from [Interface]):"$'\n' AWG_I1
+        read -r -p "Enter I2 value (from [Interface]):"$'\n' AWG_I2
+        read -r -p "Enter I3 value (from [Interface]):"$'\n' AWG_I3
+        read -r -p "Enter I4 value (from [Interface]):"$'\n' AWG_I4
+        read -r -p "Enter I5 value (from [Interface]):"$'\n' AWG_I5
     fi
     
     uci set network.${INTERFACE_NAME}=interface
@@ -777,6 +784,13 @@ add_internal_wg() {
         uci set network.${INTERFACE_NAME}.awg_h2=$AWG_H2
         uci set network.${INTERFACE_NAME}.awg_h3=$AWG_H3
         uci set network.${INTERFACE_NAME}.awg_h4=$AWG_H4
+        uci set network.${INTERFACE_NAME}.awg_s3=$AWG_S3
+        uci set network.${INTERFACE_NAME}.awg_s4=$AWG_S4
+        uci set network.${INTERFACE_NAME}.awg_i1=$AWG_I1
+        uci set network.${INTERFACE_NAME}.awg_i2=$AWG_I2
+        uci set network.${INTERFACE_NAME}.awg_i3=$AWG_I3
+        uci set network.${INTERFACE_NAME}.awg_i4=$AWG_I4
+        uci set network.${INTERFACE_NAME}.awg_i5=$AWG_I5
     fi
 
     if ! uci show network | grep -q ${CONFIG_NAME}; then
