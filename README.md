@@ -17,12 +17,12 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret2-install.sh)
 ```
 
-# Скрипт для установки
+# Скрипт для установки Get domains
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
 
-# Скрипт для удаления
+# Скрипт для удаления Get domains
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-uninstall.sh)
 ```
