@@ -7,6 +7,16 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 - [Статья на хабре](https://habr.com/ru/articles/767464/)
 - [Копия в моём блоге](https://itdog.info/tochechnyj-obhod-blokirovok-po-domenam-na-routere-s-openwrt/)
 
+# Скрипт для установки Zapret 72.9
+```
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret-install.sh)
+```
+
+# Скрипт для установки Zapret 2
+```
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret2-install.sh)
+```
+
 # Скрипт для установки
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
