@@ -9,7 +9,7 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 
 # Скрипт для установки
 ```
-sh <(wget -O - https://raw.githubusercontent.com/itdoginfo/domain-routing-openwrt/master/getdomains-install.sh)
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
 
 # Скрипт для удаления
