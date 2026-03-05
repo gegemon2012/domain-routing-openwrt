@@ -7,6 +7,11 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 - [Статья на хабре](https://habr.com/ru/articles/767464/)
 - [Копия в моём блоге](https://itdog.info/tochechnyj-obhod-blokirovok-po-domenam-na-routere-s-openwrt/)
 
+  # Скрипт для установки ZeroTier
+```
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Zerotier-install.sh)
+```
+
 # Скрипт для установки Zapret 72.9
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret-install.sh)
