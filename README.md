@@ -27,7 +27,7 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret2-install.sh)
 ```
 
-# Скрипт для установки Get domains
+# Скрипт для установки Get domains AWG 2.0
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
