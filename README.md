@@ -7,6 +7,11 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 - [Статья на хабре](https://habr.com/ru/articles/767464/)
 - [Копия в моём блоге](https://itdog.info/tochechnyj-obhod-blokirovok-po-domenam-na-routere-s-openwrt/)
 
+# Скрипт для установки HTTPS для LuCI
+```
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/LuCI-HTTPS-install.sh)
+```
+
 # Скрипт для установки Рекурсивного DNS (для Ruantiblock но может работать и с domain internal - требует проверки)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Recursive-DNS-install.sh)
