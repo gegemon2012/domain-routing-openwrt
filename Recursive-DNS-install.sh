@@ -2,7 +2,7 @@
 
 echo "========================================="
 echo "  Настройка рекурсивного DNS-резолвера"
-echo "  с DNSSEC на OpenWRT (совместимо с ruantiblock)"
+echo "  с DNSSEC на OpenWRT (УНИВЕРСАЛЬНЫЙ)"
 echo "========================================="
 echo ""
 
@@ -32,149 +32,87 @@ echo "   IP роутера: $lan_address"
 echo "   Имя роутера: $router_name"
 
 # 5. Настройка Unbound (рекурсивный резолвер на порту 5353)
-echo "[5/10] Настройка Unbound на порт 5353..."
-
-# Проверяем, существует ли секция unbound
-if ! uci show unbound > /dev/null 2>&1; then
-    uci set unbound.@unbound[0]=unbound
-fi
-
-# Основные настройки unbound
-uci set unbound.@unbound[0].listen_port='5353'  # ВАЖНО: не 53, а 5353
-uci set unbound.@unbound[0].dhcp_link='none'    # Отключаем связь с DHCP
-uci set unbound.@unbound[0].domain="$lan_domain"
-uci set unbound.@unbound[0].domain_type='static'
-
-# Включаем DNSSEC (самое важное!)
-uci set unbound.@unbound[0].validator='1'
-
-# Включаем управление
-uci set unbound.@unbound[0].unbound_control='1'
-
-# Защита от DNS-реббиндинга
+echo "[5/10] Настройка Unbound..."
+uci set unbound.@unbound[0].listen_port='5353'
 uci set unbound.@unbound[0].rebind_protection='1'
+uci set unbound.@unbound[0].dnssec='1'
+uci set unbound.@unbound[0].validator='1'
+uci set unbound.@unbound[0].unbound_control='1'
+uci set unbound.@unbound[0].localservice='0'
+# Разрешаем запросы из локальной сети
+uci set unbound.@unbound[0].query_minimize='1'
 
-# Добавляем записи для самого роутера
-uci set unbound.@unbound[0].add_local_fqdn='1'
-uci set unbound.@unbound[0].add_wan_fqdn='1'
+# 6. Настройка локальной зоны для Unbound
+echo "[6/10] Настройка локальной зоны..."
+# Удаляем старые записи если есть
+while uci delete unbound.@unbound_zone[0] 2>/dev/null; do :; done
+# Создаем новую зону для локальных имен
+uci add unbound unbound_zone
+uci set unbound.@unbound_zone[-1].type='static'
+uci set unbound.@unbound_zone[-1].zone_name="$lan_domain"
+# Добавляем сам роутер в локальную зону Unbound
+while uci delete unbound.@unbound_static[0] 2>/dev/null; do :; done
+uci add unbound unbound_static
+uci set unbound.@unbound_static[-1].name="$router_name"
+uci set unbound.@unbound_static[-1].address="$lan_address"
 
-# Отключаем форвардинг - используем рекурсию
-uci set unbound.@unbound[0].forward_upstream='0'
+uci commit unbound
 
-# 6. Настройка dnsmasq (основной DNS для клиентов)
-echo "[6/10] Настройка dnsmasq на использование unbound..."
+# 7. Настройка dnsmasq (пересылка запросов в Unbound)
+echo "[7/10] Привязка dnsmasq к Unbound..."
+uci set dhcp.@dnsmasq[0].noresolv='1'
+uci set dhcp.@dnsmasq[0].localservice='1'
+uci del dhcp.@dnsmasq[0].server 2>/dev/null
+uci add_list dhcp.@dnsmasq[0].server="127.0.0.1#5353"
+uci commit dhcp
 
-# Возвращаем dnsmasq на порт 53
-uci set dhcp.@dnsmasq[0].port='53'
-
-# Убираем принудительную выдачу DNS-сервера через DHCP-опции
-uci delete dhcp.lan.dhcp_option 2>/dev/null
-
-# Настраиваем dnsmasq на использование unbound как вышестоящего DNS
-uci set dhcp.@dnsmasq[0].noresolv='1'     # Не использовать resolv.conf
-uci set dhcp.@dnsmasq[0].resolvfile=''    # Отключаем стандартный resolv.conf
-
-# Удаляем старые upstream серверы
-uci delete dhcp.@dnsmasq[0].server 2>/dev/null
-
-# Добавляем unbound как единственный upstream
-uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5353'
-
-# 7. Отключение дополнительных DNS-прокси (если есть)
-echo "[7/10] Отключение лишних DNS-прокси..."
-if command -v https-dns-proxy >/dev/null 2>&1; then
-    /etc/init.d/https-dns-proxy disable 2>/dev/null
-    /etc/init.d/https-dns-proxy stop 2>/dev/null
-    echo "   ✅ https-dns-proxy отключен"
-fi
-
-# 8. Настройка NTP для точного времени (критично для DNSSEC)
-echo "[8/10] Настройка NTP-серверов..."
-uci set system.ntp=timeserver 2>/dev/null
-uci set system.ntp.enabled='1'
-uci delete system.ntp.server 2>/dev/null
-uci add_list system.ntp.server='0.pool.ntp.org'
-uci add_list system.ntp.server='1.pool.ntp.org'
-uci add_list system.ntp.server='2.pool.ntp.org'
-uci add_list system.ntp.server='time.google.com'
-uci add_list system.ntp.server='time.cloudflare.com'
-
-# Настройка часового пояса (раскомментируйте и укажите свой при необходимости)
-# uci set system.@system[0].timezone='MSK-3'
-# uci set system.@system[0].zonename='Europe/Moscow'
-
-# 9. Применяем все изменения
-echo "[9/10] Применение настроек..."
-uci commit
-
-# Очистка временных файлов
+# 8. Очистка временных файлов DNS (важно для бесконфликтной работы)
+echo "[8/10] Очистка кэша и старых конфигов..."
 rm -f /tmp/dnsmasq.d/* 2>/dev/null
 
-# 10. Запуск сервисов в правильном порядке
-echo "[10/10] Запуск сервисов..."
-
-# Сначала NTP
-/etc/init.d/sysntpd restart
+# 9. Применение настроек и запуск
+echo "[9/10] Запуск сервисов..."
+/etc/init.d/unbound enable
+/etc/init.d/unbound restart
 sleep 2
+/etc/init.d/dnsmasq restart
 
-# Потом unbound
-/etc/init.d/unbound start
-sleep 3
+# 10. УНИВЕРСАЛЬНЫЙ БЛОК: Совместимость с обходчиками блокировок
+echo "[10/10] Проверка установленных дополнений..."
 
-# Потом dnsmasq
-/etc/init.d/dnsmasq start
-sleep 2
-
-# И в конце ruantiblock (если установлен)
+# Для ruantiblock
 if command -v ruantiblock >/dev/null 2>&1; then
+    echo "   🔎 Обнаружен ruantiblock. Перезапуск..."
     /etc/init.d/ruantiblock restart 2>/dev/null
-    echo "   ✅ ruantiblock перезапущен"
+    echo "   ✅ ruantiblock обновлен"
 fi
 
-# Финальная проверка
-echo ""
-echo "========================================="
-echo "  ПРОВЕРКА НАСТРОЕК"
-echo "========================================="
-
-# Проверка статуса сервисов
-echo -e "\n[Проверка] Статус сервисов:"
-/etc/init.d/unbound status | grep -q "running" && echo "   ✅ unbound: работает" || echo "   ❌ unbound: НЕ работает"
-/etc/init.d/dnsmasq status | grep -q "running" && echo "   ✅ dnsmasq: работает" || echo "   ❌ dnsmasq: НЕ работает"
-
-# Проверка портов
-echo -e "\n[Проверка] Прослушиваемые порты:"
-netstat -tulpn | grep -E ':53|:5353' | sed 's/^/   /'
-
-# Проверка времени
-echo -e "\n[Проверка] Текущее время на роутере:"
-date | sed 's/^/   /'
-
-# Проверка DNS-запроса
-echo -e "\n[Проверка] DNS-запрос через localhost:"
-if nslookup youtube.com 127.0.0.1 >/dev/null 2>&1; then
-    youtube_ip=$(nslookup youtube.com 127.0.0.1 2>/dev/null | grep Address | tail -1 | awk '{print $2}')
-    echo "   ✅ youtube.com = $youtube_ip"
-else
-    echo "   ❌ Не удаётся разрешить youtube.com"
+# Для getdomains
+if [ -x "/etc/init.d/getdomains" ]; then
+    echo "   🔎 Обнаружен getdomains. Восстановление списков..."
+    /etc/init.d/getdomains start
+    sleep 3
+    /etc/init.d/dnsmasq restart 2>/dev/null
+    echo "   ✅ Списки getdomains восстановлены"
 fi
 
-# Проверка DNSSEC
-echo -e "\n[Проверка] DNSSEC:"
+# ФИНАЛЬНЫЕ ПРОВЕРКИ
+echo -e "\n[Проверка] Тестирование DNSSEC..."
 if command -v dig >/dev/null 2>&1; then
-    dnssec_test=$(dig dnssec.works +short 2>/dev/null)
-    if [ "$dnssec_test" = "ok" ]; then
-        echo "   ✅ DNSSEC: работает (dnssec.works = ok)"
+    # Тест валидной подписи
+    echo -n "   Тест cloudflare.com (DNSSEC): "
+    if dig cloudflare.com +dnssec 2>/dev/null | grep -q "ad;"; then
+        echo "✅ (AD флаг получен)"
     else
-        echo "   ❌ DNSSEC: НЕ работает (dnssec.works = $dnssec_test)"
+        echo "❌ (флаг AD отсутствует)"
     fi
     
-    # Тест с невалидной подписью
+    # Тест невалидной подписи
     echo -n "   Тест sigfail.ippacket.stream: "
     if dig sigfail.ippacket.stream +short 2>/dev/null | grep -q "SERVFAIL"; then
         echo "✅ (SERVFAIL - правильно)"
     else
-        echo "❌ (должен быть SERVFAIL)"
+        echo "❌ (ошибка - подпись должна быть невалидна)"
     fi
 else
     echo "   ⚠️ dig не установлен, пропускаем проверку DNSSEC"
@@ -189,25 +127,9 @@ else
     echo "   ❌ Не удаётся разрешить $router_name.$lan_domain"
 fi
 
-# Проверка цепочки для ruantiblock
-echo -e "\n[Проверка] Цепочка DNS для ruantiblock:"
-echo "   Клиент -> dnsmasq(порт 53) -> unbound(порт 5353) -> корневые DNS"
-echo "   dnsmasq использует upstream: 127.0.0.1#5353"
-
 echo ""
 echo "========================================="
 echo "  НАСТРОЙКА ЗАВЕРШЕНА УСПЕШНО"
+echo "  Теперь ваш DNS рекурсивный и защищен,"
+echo "  а списки обхода блокировок активны."
 echo "========================================="
-echo ""
-echo "✅ Все сервисы настроены и запущены"
-echo "✅ ruantiblock теперь должен работать корректно"
-echo "✅ DNSSEC включен и работает"
-echo ""
-echo "➡️  Для проверки DNSSEC зайдите на сайт:"
-echo "   https://dnscheck.tools"
-echo ""
-echo "➡️  Полезные команды:"
-echo "   logread | grep dnsmasq    # логи dnsmasq"
-echo "   logread | grep unbound    # логи unbound"
-echo "   ruantiblock status        # статус ruantiblock"
-echo ""
