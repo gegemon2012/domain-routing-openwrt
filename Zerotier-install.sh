@@ -1,74 +1,94 @@
 #!/bin/sh
 
-# 1. Установка (на случай, если пакет слетел)
-opkg update
-opkg install zerotier
+# 1. Проверка установки пакета
+if ! command -v zerotier-cli >/dev/null 2>&1; then
+    echo "Установка ZeroTier..."
+    opkg update && opkg install zerotier
+else
+    echo "ZeroTier уже установлен."
+fi
 
-# 2. Остановка сервиса перед правкой конфигов
-/etc/init.d/zerotier stop
+# 2. Получение Network ID
+# Проверяем, есть ли уже настроенный ID в системе
+OLD_ID=$(uci -q get zerotier.ztnoname.join)
 
-echo "Введите ваш ZeroTier Network ID:"
-read ZT_ID
+if [ -n "$OLD_ID" ]; then
+    echo "Найден существующий Network ID: $OLD_ID"
+    echo "Хотите изменить его? (y/n)"
+    read change_id
+    if [ "$change_id" = "y" ]; then
+        echo "Введите новый ZeroTier Network ID:"
+        read ZT_ID
+    else
+        ZT_ID=$OLD_ID
+    fi
+else
+    echo "Введите ваш ZeroTier Network ID:"
+    read ZT_ID
+fi
 
-# 3. Полная перезапись конфига ZeroTier (прямая запись в файл)
-cat <<EOF > /etc/config/zerotier
-config zerotier 'ztnoname'
-	option enabled '1'
-	list join '$ZT_ID'
-EOF
+# 3. Настройка ZeroTier
+echo "Настройка конфигов..."
+uci set zerotier.ztnoname=zerotier
+uci set zerotier.ztnoname.enabled='1'
+# Очищаем список и добавляем новый ID
+uci del_list zerotier.ztnoname.join="$OLD_ID" 2>/dev/null
+uci add_list zerotier.ztnoname.join="$ZT_ID"
+uci commit zerotier
 
 # 4. Настройка сети (Интерфейс)
-# Удаляем старое, если есть, и пишем заново
-sed -i '/config interface .zerotier./,/^$/d' /etc/config/network
-cat <<EOF >> /etc/config/network
-
-config interface 'zerotier'
-	option proto 'none'
-	option device 'zt+'
-EOF
+# Создаем интерфейс 'zerotier', если его нет
+if ! uci -q get network.zerotier >/dev/null; then
+    uci set network.zerotier=interface
+    uci set network.zerotier.proto='none'
+    uci set network.zerotier.device='zt+'
+    uci commit network
+fi
 
 # 5. Настройка Firewall (Зона и Forwarding)
-# Очищаем старые упоминания zerotier из firewall чтобы не было конфликтов
-sed -i '/zerotier/d' /etc/config/firewall
+# Проверяем наличие зоны 'zerotier', чтобы не плодить дубликаты
+if ! uci -q get firewall.zerotier_zone >/dev/null; then
+    # Создаем именованную секцию для удобного управления
+    uci set firewall.zerotier_zone=zone
+    uci set firewall.zerotier_zone.name='zerotier'
+    uci set firewall.zerotier_zone.input='ACCEPT'
+    uci set firewall.zerotier_zone.forward='ACCEPT'
+    uci set firewall.zerotier_zone.output='ACCEPT'
+    uci set firewall.zerotier_zone.network='zerotier'
+    uci set firewall.zerotier_zone.masq='1'
+    uci set firewall.zerotier_zone.mtu_fix='1'
+    
+    # Forwarding LAN -> ZeroTier
+    uci add firewall forwarding
+    uci set firewall.@forwarding[-1].src='lan'
+    uci set firewall.@forwarding[-1].dest='zerotier'
+    
+    # Forwarding ZeroTier -> LAN
+    uci add firewall forwarding
+    uci set firewall.@forwarding[-1].src='zerotier'
+    uci set firewall.@forwarding[-1].dest='lan'
+    
+    uci commit firewall
+fi
 
-cat <<EOF >> /etc/config/firewall
-
-config zone
-	option name 'zerotier'
-	option input 'ACCEPT'
-	option forward 'ACCEPT'
-	option output 'ACCEPT'
-	option network 'zerotier'
-	option masq '1'
-	option mtu_fix '1'
-
-config forwarding
-	option src 'lan'
-	option dest 'zerotier'
-
-config forwarding
-	option src 'zerotier'
-	option dest 'lan'
-EOF
-
-# 6. Запуск и инициализация ключей
+# 6. Применение настроек и запуск
+echo "Перезапуск сервисов..."
 /etc/init.d/network restart
 /etc/init.d/firewall restart
 /etc/init.d/zerotier enable
 /etc/init.d/zerotier start
 
-echo "Генерация ключей и запуск сервиса (ждем 10 секунд)..."
+echo "Ожидание инициализации (10 сек)..."
 sleep 10
 
-echo "------------------------------------------------------"
-# Проверка статуса
+# 7. Финальный статус
 NODE_ID=$(zerotier-cli status | awk '{print $3}')
 
-if [ "$NODE_ID" = "" ] || [ "$NODE_ID" = "OFFLINE" ]; then
-    echo "Сервис запускается медленно. Попробуйте 'zerotier-cli status' через минуту."
-    echo "Если ошибка 'missing port' осталась - проверьте лог командой: logread | grep zerotier"
-else
+echo "------------------------------------------------------"
+if [ "$NODE_ID" = "ONLINE" ] || [ -n "$NODE_ID" ]; then
     echo "Успех! Ваш Node ID: $NODE_ID"
-    echo "Теперь добавьте этот ID в панель управления ZeroTier."
+    echo "Не забудьте авторизовать это устройство в панели ZeroTier Central."
+else
+    echo "Ошибка: ZeroTier не смог запуститься. Проверьте 'logread | grep zerotier'"
 fi
 echo "------------------------------------------------------"
