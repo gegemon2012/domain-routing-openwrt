@@ -15,7 +15,7 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/LuCI-HTTPS-install.sh)
 ```
 
-# Скрипт для установки Рекурсивного DNS (для Ruantiblock но может работать и с domain internal - требует проверки)
+# Скрипт для установки Рекурсивного DNS (для Ruantiblock и Get domains AWG 2.0 - требует проверки)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Recursive-DNS-install.sh)
 ```
