@@ -20,7 +20,7 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Recursive-DNS-install.sh)
 ```
 
-# Скрипт для установки ZeroTier (Alpha version)
+# Скрипт для установки ZeroTier (требует проверки)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Zerotier-install.sh)
 ```
