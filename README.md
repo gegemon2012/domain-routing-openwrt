@@ -10,12 +10,12 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 - [Статья на хабре](https://habr.com/ru/articles/767464/)
 - [Копия в моём блоге](https://itdog.info/tochechnyj-obhod-blokirovok-po-domenam-na-routere-s-openwrt/)
 
-# Скрипт для установки оптимизации роутера (irqbalance+zram swap)
+# Скрипт для оптимизации работы роутера (irqbalance+zram swap)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/optimization-router-install.sh)
 ```
 
-# Скрипт для установки HTTPS для LuCI
+# Скрипт для установки поддержки HTTPS в LuCI
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/LuCI-HTTPS-install.sh)
 ```
