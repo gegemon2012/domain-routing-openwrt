@@ -30,16 +30,6 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Zerotier-install.sh)
 ```
 
-# Скрипт для установки Zapret v72.12
-```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret-install.sh)
-```
-
-# Скрипт для установки Zapret 2 v0.9.4.5
-```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/zapret2-install.sh)
-```
-
 # Скрипт для установки Get domains AWG 2.0
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
