@@ -1,52 +1,69 @@
 #!/bin/sh
 
-# 1. Проверка количества ядер процессора
-CPU_CORES=$(grep -c ^processor /proc/cpuinfo)
-echo "Обнаружено ядер: $CPU_CORES"
+# Функция управления IPv6
+manage_ipv6() {
+    echo ""
+    echo "=========================================="
+    echo "   Управление протоколом IPv6"
+    echo "=========================================="
+    echo "1) Полностью отключить (рекомендуется при отсутствии поддержки провайдером)"
+    echo "2) Включить/Восстановить (стандартные настройки OpenWrt)"
+    echo "3) Оставить без изменений"
+    printf "Выберите вариант (1-3): "
+    read ipv6_opt
 
-# Обновляем списки пакетов
-opkg update
+    case $ipv6_opt in
+        1)
+            echo "--- Отключение IPv6 ---"
+            # Удаление WAN6 интерфейса
+            if uci get network.wan6 >/dev/null 2>&1; then
+                uci delete network.wan6
+                echo "[+] Интерфейс WAN6 удален"
+            fi
 
-# 2. Настройка irqbalance (для 2+ ядер)
-if [ "$CPU_CORES" -ge 2 ]; then
-    echo "Многоядерный процессор. Установка irqbalance..."
-    opkg install irqbalance luci-app-irqbalance
-    /etc/init.d/irqbalance enable
-    /etc/init.d/irqbalance start
-else
-    echo "Одноядерный процессор. Пропуск irqbalance."
-fi
+            # Отключение RA и DHCPv6 на LAN
+            uci set dhcp.lan.ra='disabled'
+            uci set dhcp.lan.dhcpv6='disabled'
+            uci set dhcp.lan.ra_management='0'
+            echo "[+] Раздача IPv6 в локальной сети отключена"
 
-# 3. Установка компонентов zram
-echo "Установка модулей zram и библиотек сжатия..."
-opkg install kmod-zram zram-swap kmod-lib-lz4 kmod-lib-zstd
+            # Остановка службы odhcpd (источник ошибок в логах)
+            /etc/init.d/odhcpd stop
+            /etc/init.d/odhcpd disable
+            echo "[+] Служба odhcpd остановлена и выключена"
 
-# 4. Расчет памяти и настройка UCI
-echo "Настройка параметров в system.@system[0]..."
+            uci commit
+            /etc/init.d/network restart
+            echo "IPv6 успешно отключен."
+            ;;
+        2)
+            echo "--- Включение IPv6 ---"
+            # Восстановление интерфейса WAN6
+            uci set network.wan6=interface
+            uci set network.wan6.proto='dhcpv6'
+            uci set network.wan6.device='@wan'
+            echo "[+] Интерфейс WAN6 восстановлен"
 
-# Получаем объем RAM в килобайтах из /proc/meminfo
-MEM_TOTAL_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+            # Включение RA и DHCPv6 на LAN
+            uci set dhcp.lan.ra='server'
+            uci set dhcp.lan.dhcpv6='server'
+            uci set dhcp.lan.ra_management='1'
+            echo "[+] Раздача IPv6 в локальной сети включена"
 
-# Считаем 50% от объема и переводим в Мегабайты
-# Делим на 1024 (в МБ) и еще на 2 (половина) = делим на 2048
-ZRAM_SIZE_MB=$(( MEM_TOTAL_KB / 2048 ))
+            # Включение службы odhcpd
+            /etc/init.d/odhcpd enable
+            /etc/init.d/odhcpd start
+            echo "[+] Служба odhcpd запущена"
 
-echo "Рассчитанный размер zram: $ZRAM_SIZE_MB MB"
+            uci commit
+            /etc/init.d/network restart
+            echo "IPv6 восстановлен. Устройствам может потребоваться переподключение."
+            ;;
+        *)
+            echo "Пропуск настройки IPv6."
+            ;;
+    esac
+}
 
-# Устанавливаем параметры, которые использует ваш /etc/init.d/zram
-uci set system.@system[0].zram_size_mb="$ZRAM_SIZE_MB"
-uci set system.@system[0].zram_comp_algo='zstd'
-uci set system.@system[0].zram_priority='100'
-
-# Применяем изменения в конфиг
-uci commit system
-
-# 5. Перезапуск сервиса
-echo "Перезагрузка zram для применения изменений..."
-/etc/init.d/zram stop
-sleep 2
-/etc/init.d/zram start
-
-echo "----------------------------------------"
-echo "Оптимизация завершена успешно."
-/etc/init.d/zram status
+# Далее в вашем скрипте, там где идут основные настройки (например, после оптимизации CPU/ZRAM):
+manage_ipv6
