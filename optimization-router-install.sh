@@ -1,78 +1,65 @@
 #!/bin/sh
 
-# 1. Проверка процессора и IRQ Balance
-echo "--- Проверка процессора ---"
+# 1. Процессор и irqbalance
+echo "--- Шаг 1: Проверка CPU и IRQ ---"
 CPU_CORES=$(grep -c ^processor /proc/cpuinfo)
-echo "Обнаружено ядер: $CPU_CORES"
-
 if [ "$CPU_CORES" -gt 1 ]; then
-    echo "Многоядерный процессор. Установка irqbalance..."
+    echo "Ядер: $CPU_CORES. Установка irqbalance..."
     opkg update
-    # Пытаемся установить пакеты, если один не найден - не страшно
     opkg install irqbalance
-    opkg install luci-app-irqbalance || echo "Предупреждение: luci-app-irqbalance не найден, пропущено."
-    
-    if [ -f /etc/init.d/irqbalance ]; then
-        /etc/init.d/irqbalance enable
-        /etc/init.d/irqbalance start
-        echo "[OK] Irqbalance активирован."
-    fi
+    LUCI_IRQ=$(opkg list | grep luci-app-irqbalance | awk '{print $1}' | head -n 1)
+    [ -n "$LUCI_IRQ" ] && opkg install "$LUCI_IRQ"
+    /etc/init.d/irqbalance enable
+    /etc/init.d/irqbalance start
+else
+    echo "Одноядерный CPU. Пропуск."
 fi
 
-# 2. Настройка ZRAM
-echo ""
-echo "--- Настройка ZRAM ---"
+# 2. ZRAM (50% от ОЗУ)
+echo -e "\n--- Шаг 2: Настройка ZRAM (50%) ---"
 opkg update
 opkg install zram-swap kmod-zram
-# Пакет luci может называться по-разному в разных версиях
-opkg install luci-app-zram-swap || opkg install luci-i18n-zram-swap-ru || echo "Интерфейс Luci для ZRAM не найден."
 
-# ОПРЕДЕЛЕНИЕ РАЗМЕРА (Безопасный метод)
-# Берем общее кол-во памяти в Кб и переводим в Мб
+# Вычисляем 50% от общего ОЗУ
 TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_RAM_MB=$(( TOTAL_RAM_KB / 1024 ))
+ZRAM_SIZE=$(( TOTAL_RAM_MB / 2 ))
 
-# Устанавливаем ZRAM равным объему ОЗУ (но не более 4096Мб для стабильности)
-ZRAM_SIZE=$TOTAL_RAM_MB
-if [ "$ZRAM_SIZE" -gt 4096 ]; then
-    ZRAM_SIZE=4096
-fi
+# Ограничение: не больше 2ГБ (на случай если это Mini PC с большим ОЗУ)
+[ "$ZRAM_SIZE" -gt 2048 ] && ZRAM_SIZE=2048
 
-# ОПРЕДЕЛЕНИЕ АЛГОРИТМА
-# Сначала создаем временное устройство, чтобы проверить доступные алгоритмы
+# Поиск лучшего алгоритма
 modprobe zram 2>/dev/null
 ALGO="lzo"
-if [ -f /sys/block/zram0/comp_algorithm ]; then
-    for a in zstd lz4 lzo; do
-        if grep -q "$a" /sys/block/zram0/comp_algorithm; then
-            ALGO=$a
-            break
-        fi
-    done
-fi
+for a in zstd lz4 lzo; do
+    if grep -q "$a" /sys/block/zram0/comp_algorithm 2>/dev/null; then
+        ALGO=$a
+        break
+    fi
+done
 
-echo "Общий объем ОЗУ: $TOTAL_RAM_MB MiB"
-echo "Выделено под ZRAM: $ZRAM_SIZE MiB"
-echo "Выбран алгоритм: $ALGO"
+echo "Общее ОЗУ: $TOTAL_RAM_MB MiB. Назначаем ZRAM: $ZRAM_SIZE MiB."
+echo "Алгоритм сжатия: $ALGO"
 
-# Запись в UCI
+# Запись в UCI (именно эти параметры читает ваш /etc/init.d/zram)
 uci set system.@system[0].zram_size_mb="$ZRAM_SIZE"
 uci set system.@system[0].zram_comp_algo="$ALGO"
 uci commit system
 
-# Перезапуск ZRAM через ваш скрипт /etc/init.d/zram
-/etc/init.d/zram stop
-sleep 2
-/etc/init.d/zram start
+# Перезапуск сервиса
+/etc/init.d/zram restart
 
-# 3. Управление IPv6 (тот же блок)
-echo ""
-echo "--- Управление IPv6 ---"
-echo "1) Отключить 2) Включить 3) Пропустить"
-read ipv6_choice
-case "$ipv6_choice" in
+# 3. IPv6 Меню
+echo -e "\n--- Шаг 3: IPv6 ---"
+echo "1) Отключить (убрать ошибки в логах)"
+echo "2) Включить"
+echo "3) Пропустить"
+printf "Выбор: "
+read choice
+
+case "$choice" in
     1)
-        if uci get network.wan6 >/dev/null 2>&1; then uci delete network.wan6; fi
+        uci -q delete network.wan6
         uci set dhcp.lan.ra='disabled'
         uci set dhcp.lan.dhcpv6='disabled'
         uci set dhcp.lan.ra_management='0'
@@ -80,7 +67,21 @@ case "$ipv6_choice" in
         /etc/init.d/odhcpd disable
         uci commit
         /etc/init.d/network restart
+        echo "IPv6 отключен."
+        ;;
+    2)
+        uci set network.wan6=interface
+        uci set network.wan6.proto='dhcpv6'
+        uci set network.wan6.device='@wan'
+        uci set dhcp.lan.ra='server'
+        uci set dhcp.lan.dhcpv6='server'
+        uci set dhcp.lan.ra_management='1'
+        /etc/init.d/odhcpd enable
+        /etc/init.d/odhcpd start
+        uci commit
+        /etc/init.d/network restart
+        echo "IPv6 включен."
         ;;
 esac
 
-echo "Готово! Проверьте статус командой: /etc/init.d/zram status"
+echo -e "\nОптимизация завершена!"
