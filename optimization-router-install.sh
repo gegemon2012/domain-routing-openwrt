@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # 1. IPv6 Меню (с правкой ULA для устранения задержек)
-echo -e "\n--- Шаг 3: IPv6 ---"
+echo -e "\n--- Шаг 1: IPv6 ---"
 echo "1) Полностью отключить (убрать ошибки в логах и задержки в браузере)"
 echo "2) Включить (стандартные настройки)"
 echo "3) Пропустить"
@@ -53,7 +53,7 @@ case "$choice" in
 esac
 
 # 2. Процессор и irqbalance
-echo "--- Шаг 1: Проверка CPU и IRQ ---"
+echo "--- Шаг 2: Проверка CPU и IRQ ---"
 CPU_CORES=$(grep -c ^processor /proc/cpuinfo)
 if [ "$CPU_CORES" -gt 1 ]; then
     echo "Ядер: $CPU_CORES. Установка irqbalance..."
@@ -68,7 +68,7 @@ else
 fi
 
 # 3. ZRAM (50% от ОЗУ)
-echo -e "\n--- Шаг 2: Настройка ZRAM (50%) ---"
+echo -e "\n--- Шаг 3: Настройка ZRAM (50%) ---"
 opkg update
 opkg install zram-swap kmod-zram
 
