@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# 1. IPv6 Меню (с правкой ULA и «умной» чисткой Firewall)
+# 1. IPv6 Меню (с правкой ULA и чисткой Firewall)
 echo -e "\n--- Шаг 1: IPv6 и Firewall ---"
-echo "1) Полностью отключить (Сеть + ULA + Удаление правил IPv6)"
-echo "2) Включить (Стандартные настройки + Восстановление правил)"
+echo "1) Полностью отключить (Сеть + ULA + Правила в Firewall)"
+echo "2) Включить (Стандартные настройки + Правила в Firewall)"
 echo "3) Пропустить"
 printf "Выбор: "
 read choice
@@ -19,40 +19,73 @@ case "$choice" in
         uci set dhcp.lan.ra_management='0'
         uci set network.globals.ula_prefix=''
         
-        # --- Очистка Firewall от IPv6 (Безопасное удаление) ---
-        # Функция для удаления правила только если оно существует, чтобы не было "Not found"
-        safe_delete_rule() {
-            if uci get firewall.$1 >/dev/null 2>&1; then
-                uci -q delete firewall.$1
-            fi
-        }
-
-        # Пытаемся удалить стандартные именованные правила
-        safe_delete_rule "allow_dhcpv6"
-        safe_delete_rule "allow_mld"
-        safe_delete_rule "allow_icmpv6_input"
-        safe_delete_rule "allow_icmpv6_forward"
+        # --- Очистка Firewall от IPv6 (Мусор) ---
+        # Удаляем специфические правила по именам, которые обычно есть в OpenWrt
+        uci -q delete firewall.allow_dhcpv6
+        uci -q delete firewall.allow_mld
+        uci -q delete firewall.allow_icmpv6_input
+        uci -q delete firewall.allow_icmpv6_forward
         
-        # Поиск и удаление всех остальных правил, где явно указано family 'ipv6'
-        # Используем конструкцию, которая не вызывает ошибку при пустом результате
-        rules_to_del=$(uci show firewall | grep "family='ipv6'" | cut -d'.' -f2 | cut -d'=' -f1 | sort -r)
-        for rule in $rules_to_del; do
-            uci -q delete firewall.$rule
+        # Дополнительный поиск и удаление правил по полю family 'ipv6'
+        while uci show firewall | grep -q "family='ipv6'"; do
+            RULE_INDEX=$(uci show firewall | grep "family='ipv6'" | head -n1 | cut -d'.' -f2 | cut -d'=' -f1)
+            uci -q delete firewall.$RULE_INDEX
         done
 
-        uci commit firewall
-        uci commit network
-        uci commit dhcp
-
+        uci commit
         /etc/init.d/odhcpd stop
         /etc/init.d/odhcpd disable
         /etc/init.d/network restart
         /etc/init.d/firewall restart
-        echo "✅ IPv6 отключен. Конфигурация Firewall очищена без ошибок."
+        echo "✅ IPv6 полностью отключен. Firewall очищен от правил IPv6."
         ;;
     2)
         echo "Включение IPv6 и восстановление правил..."
-        # (Оставляем блок включения из предыдущего ответа, он работает корректно)
+        
+        # --- Настройки сети ---
+        uci set network.wan6=interface
+        uci set network.wan6.proto='dhcpv6'
+        uci set network.wan6.device='@wan'
+        [ -z "$(uci get network.globals.ula_prefix 2>/dev/null)" ] && uci set network.globals.ula_prefix='fd00::/48'
+        uci set dhcp.lan.ra='server'
+        uci set dhcp.lan.dhcpv6='server'
+        uci set dhcp.lan.ra_management='1'
+        
+        # --- Восстановление базовых правил Firewall (IPv6) ---
+        # Добавляем Allow-DHCPv6
+        uci set firewall.allow_dhcpv6=rule
+        uci set firewall.allow_dhcpv6.name='Allow-DHCPv6'
+        uci set firewall.allow_dhcpv6.src='wan'
+        uci set firewall.allow_dhcpv6.proto='udp'
+        uci set firewall.allow_dhcpv6.dest_port='546'
+        uci set firewall.allow_dhcpv6.family='ipv6'
+        uci set firewall.allow_dhcpv6.target='ACCEPT'
+
+        # Добавляем базовый ICMPv6 Input
+        uci set firewall.allow_icmpv6_input=rule
+        uci set firewall.allow_icmpv6_input.name='Allow-ICMPv6-Input'
+        uci set firewall.allow_icmpv6_input.src='wan'
+        uci set firewall.allow_icmpv6_input.proto='icmp'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='echo-request'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='echo-reply'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='destination-unreachable'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='packet-too-big'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='time-exceeded'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='bad-header'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='unknown-header-type'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='router-solicitation'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='neighbour-solicitation'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='router-advertisement'
+        uci add_list firewall.allow_icmpv6_input.icmp_type='neighbour-advertisement'
+        uci set firewall.allow_icmpv6_input.family='ipv6'
+        uci set firewall.allow_icmpv6_input.target='ACCEPT'
+
+        uci commit
+        /etc/init.d/odhcpd enable
+        /etc/init.d/odhcpd start
+        /etc/init.d/network restart
+        /etc/init.d/firewall restart
+        echo "✅ IPv6 включен. Базовые правила Firewall восстановлены."
         ;;
     *)
         echo "Пропущено."
