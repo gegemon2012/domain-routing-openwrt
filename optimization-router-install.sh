@@ -83,8 +83,15 @@ echo "Алгоритм сжатия: $ALGO"
 
 uci set system.@system[0].zram_size_mb="$ZRAM_SIZE"
 uci set system.@system[0].zram_comp_algo="$ALGO"
-uci commit system
-
 /etc/init.d/zram restart
+
+# 4. Устанавливаем период (frequency) Watchdog в 50 секунд
+uci set system.@system[0].watchdog_period='50'
+
+# 5. Устанавливаем таймаут (timeout) Watchdog в 300 секунд
+uci set system.@system[0].watchdog_timeout='300'
+
+# Сохраняем изменения
+uci commit system
 
 echo -e "\nОптимизация завершена!"
