@@ -25,7 +25,7 @@ def parse_and_fix_networks(input_text):
     return sorted(list(set(networks)), key=sort_key)
 
 def main():
-    print("Введите IP-адреса или сети (Ctrl+D для завершения):")
+    print("Введите IP-адреса или сети (Ctrl+V, потом Enter, потом Ctrl+D для завершения):")
     try:
         input_text = sys.stdin.read()
         if not input_text.strip():
