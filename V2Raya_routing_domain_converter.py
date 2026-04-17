@@ -13,7 +13,7 @@ def parse_domains(input_text):
     return sorted(list(set(d.lower() for d in domains)))
 
 def main():
-    print("Введите домены (Ctrl+V, потом Enter, потом Ctrl+D для завершения):")
+    print("Введите домены (или вставьте через Ctrl+V, потом Enter, потом Ctrl+D для завершения):")
     try:
         input_text = sys.stdin.read()
         if not input_text.strip():
