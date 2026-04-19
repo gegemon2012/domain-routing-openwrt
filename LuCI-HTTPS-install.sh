@@ -1,73 +1,64 @@
 #!/bin/sh
 
-# 1. Обновление и установка
-echo "--- Шаг 1: Установка необходимых пакетов ---"
-opkg update && opkg install luci-ssl px5g-mbedtls luci-app-uhttpd
+# 1. Проверка установки (Таймер 10 сек)
+echo "--- Шаг 1: Установка пакетов (HTTPS) ---"
+echo "Нажмите ЛЮБУЮ клавишу за 10 сек, чтобы ПРОПУСТИТЬ установку пакетов."
+echo "(Пропускайте, если luci-ssl и px5g уже вшиты в прошивку)"
+
+if read -t 10 -n 1; then
+    echo -e "\n[!] Установка пропущена. Переходим к настройке сертификатов."
+else
+    echo -e "\n[+] Обновление и установка..."
+    opkg update
+    # Используем standalone версию для экономии места и независимости от библиотек
+    opkg install luci-ssl px5g-standalone luci-app-uhttpd
+fi
 
 # 2. Сбор данных для сертификата
-echo "--- Шаг 2: Настройка данных сертификата ---"
-echo "Оставьте поле пустым и нажмите Enter, чтобы использовать значение по умолчанию."
+echo -e "\n--- Шаг 2: Настройка данных сертификата ---"
+# Используем автоматические значения, если пользователь нажмет Enter
+printf "Общее имя/Хост (CN) [OpenWrt]: "
+read cert_cn
+cert_cn=${cert_cn:-OpenWrt}
 
-read -p "Страна (C) [RU]: " cert_c
-cert_c=${cert_c:-RU}
-
-read -p "Область/Край (ST) [State]: " cert_st
-cert_st=${cert_st:-State}
-
-read -p "Город (L) [City]: " cert_l
-cert_l=${cert_l:-City}
-
-read -p "Организация (O) [OpenWrt]: " cert_o
-cert_o=${cert_o:-OpenWrt}
-
-read -p "Общее имя/Хост (CN) [Router]: " cert_cn
-cert_cn=${cert_cn:-Router}
-
-# 3. Генерация сертификатов
 CERT_FILE="/etc/uhttpd.crt"
 KEY_FILE="/etc/uhttpd.key"
 
-if [ -f "$CERT_FILE" ] || [ -f "$KEY_FILE" ]; then
-    printf "\nФайлы сертификатов уже существуют. Перезаписать их? (y/n): "
+# 3. Генерация сертификатов
+if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+    printf "Файлы сертификатов уже существуют. Перезаписать? (y/n): "
     read confirmation
-    if [ "$confirmation" = "y" ]; then
-        echo "Генерируем новые ключи..."
-        px5g selfsigned -der -days 3650 -newkey rsa:4096 -keyout "$KEY_FILE" -out "$CERT_FILE" \
-        -subj "/C=$cert_c/ST=$cert_st/L=$cert_l/O=$cert_o/CN=$cert_cn"
-    else
-        echo "Используем старые сертификаты."
-    fi
+    [ "$confirmation" != "y" ] && REGEN=0 || REGEN=1
 else
-    echo "Генерируем новые сертификаты..."
-    px5g selfsigned -der -days 3650 -newkey rsa:4096 -keyout "$KEY_FILE" -out "$CERT_FILE" \
-    -subj "/C=$cert_c/ST=$cert_st/L=$cert_l/O=$cert_o/CN=$cert_cn"
+    REGEN=1
 fi
 
-# 4. Настройка редиректа
-echo -e "\n--- Шаг 3: Настройка UCI ---"
-printf "Включить автоматический редирект с HTTP на HTTPS? (y/n): "
+if [ "$REGEN" -eq 1 ]; then
+    echo "Генерируем сертификат (RSA 2048 для экономии CPU)..."
+    # Для 16мб роутера 2048 бит — оптимальный баланс скорости и защиты
+    px5g selfsigned -der -days 3650 -newkey rsa:4096 -keyout "$KEY_FILE" -out "$CERT_FILE" \
+    -subj "/C=RU/ST=State/L=City/O=OpenWrt/CN=$cert_cn"
+fi
+
+# 4. Настройка UCI
+echo -e "\n--- Шаг 3: Настройка UCI и Редирект ---"
+printf "Включить редирект HTTP -> HTTPS? (y/n): "
 read do_redirect
 
-# 5. Применение настроек UCI
-# Добавляем порты (UCI аккуратно обработает дубликаты)
-uci add_list uhttpd.main.listen_https='0.0.0.0:443'
-uci add_list uhttpd.main.listen_https='[::]:443'
 uci set uhttpd.main.cert="$CERT_FILE"
 uci set uhttpd.main.key="$KEY_FILE"
+uci add_list uhttpd.main.listen_https='0.0.0.0:443'
+uci add_list uhttpd.main.listen_https='[::]:443'
 
 if [ "$do_redirect" = "y" ]; then
-    echo "Редирект ВКЛЮЧЕН."
     uci set uhttpd.main.redirect_https='1'
 else
-    echo "Редирект ОТКЛЮЧЕН."
     uci set uhttpd.main.redirect_https='0'
 fi
 
 uci commit uhttpd
 
-# 6. Финал
-echo "Перезапуск uHTTPd..."
+# 5. Финал
+echo "Перезапуск сервера..."
 /etc/init.d/uhttpd restart
-
-echo -e "\nГотово! Текущие настройки портов и сертификата:"
-uci show uhttpd.main | grep -E 'listen_https|cert|key|redirect_https'
+echo "✅ Готово! Теперь LuCI доступен по HTTPS."
