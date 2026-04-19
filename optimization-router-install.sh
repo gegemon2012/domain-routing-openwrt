@@ -52,10 +52,23 @@ CPU_CORES=$(grep -c ^processor /proc/cpuinfo)
 if [ "$CPU_CORES" -gt 1 ]; then
     echo "Ядер: $CPU_CORES. Установка irqbalance..."
     opkg update
-    # Упрощенная установка без лишних проверок через grep
     opkg install irqbalance luci-app-irqbalance
+    
+    # ПРИНУДИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ
+    # Иногда Luci-приложение блокирует автозапуск, пока не будет создан конфиг
+    [ ! -f /etc/config/irqbalance ] && touch /etc/config/irqbalance
+    
+    # Включаем через стандартный скрипт
     /etc/init.d/irqbalance enable
+    
+    # Если сервис все равно "Disabled" в Luci, используем прямой запуск
     /etc/init.d/irqbalance start
+    
+    # Проверка: если не запустился, пробуем форсировать через UCI
+    uci set irqbalance.irqbalance.enabled='1'
+    uci commit irqbalance
+    
+    echo "✅ irqbalance активирован."
 else
     echo "Одноядерный CPU. Пропуск."
 fi
