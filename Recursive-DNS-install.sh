@@ -73,7 +73,7 @@ while uci get dhcp.@dnsmasq[0].server >/dev/null 2>&1; do
 done
 
 uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5353'
-uci add_list dhcp.@dnsmasq[0].server='8.8.8.8' # Резерв для стабильности времени
+uci add_list dhcp.@dnsmasq[0].server='9.9.9.9' # Резерв для стабильности времени
 uci set dhcp.@dnsmasq[0].noresolv='1'
 uci set dhcp.@dnsmasq[0].cachesize='1000'
 uci commit dhcp
