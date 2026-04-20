@@ -10,7 +10,7 @@ Shell скрипт и [роль для Ansible](https://galaxy.ansible.com/ui/st
 - [Статья на хабре](https://habr.com/ru/articles/767464/)
 - [Копия в моём блоге](https://itdog.info/tochechnyj-obhod-blokirovok-po-domenam-na-routere-s-openwrt/)
 
-# Скрипт для оптимизации работы роутера (IPv6 del + irqbalance + zram swap + watchdog freq/time)
+# Скрипт для оптимизации работы роутера (IPv6 del + irqbalance + zram swap + watchdog freq/time + Hardware Flow Offloading)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/optimization-router-install.sh)
 ```
