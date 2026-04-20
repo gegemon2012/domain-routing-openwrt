@@ -35,11 +35,20 @@ else
     opkg install unbound-daemon luci-app-unbound bind-dig unbound-anchor
 fi
 
-# 3. Настройка Unbound
+# 3. Настройка Unbound (Улучшенная версия)
 echo "[3/4] Настройка Unbound и DNSSEC..."
+
+# Временный DNS, чтобы скачались ключи
+echo "nameserver 8.8.8.8" > /tmp/resolv.conf.auto
+
 mkdir -p /var/lib/unbound
-[ ! -f /var/lib/unbound/root.key ] && unbound-anchor -a /var/lib/unbound/root.key
-chown -R unbound:unbound /var/lib/unbound
+
+# Принудительное обновление ключей (игнорируем ошибки сети)
+unbound-anchor -a /var/lib/unbound/root.key || echo "Предупреждение: Ключ не скачан, проверьте интернет"
+
+# КРИТИЧНО: Права именно на файл ключа
+chown unbound:unbound /var/lib/unbound/root.key
+chmod 644 /var/lib/unbound/root.key
 
 # Сброс и чистая настройка UCI
 uci del unbound.@unbound[0] 2>/dev/null
@@ -47,8 +56,11 @@ uci add unbound unbound
 uci set unbound.@unbound[0].validator='1'
 uci set unbound.@unbound[0].port='5353'
 uci set unbound.@unbound[0].localservice='1'
+# Указываем Unbound использовать созданный ключ
 uci add_list unbound.@unbound[0].unbound_conf='auto-trust-anchor-file: "/var/lib/unbound/root.key"'
 uci commit unbound
+
+/etc/init.d/unbound restart
 
 # 4. Привязка к Dnsmasq
 echo "[4/4] Перенаправление Dnsmasq -> Unbound (5353)..."
