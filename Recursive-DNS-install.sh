@@ -17,6 +17,7 @@ uci add_list system.ntp.server='0.ru.pool.ntp.org'
 uci add_list system.ntp.server='1.ru.pool.ntp.org'
 uci add_list system.ntp.server='ntp1.vniiftri.ru' # Эталонное время РФ (НИИР)
 uci add_list system.ntp.server='time.cloudflare.com'
+uci add_list system.ntp.server='time.google.com'
 uci set system.ntp.enabled='1'
 uci set system.ntp.enable_server='0'
 uci commit system
@@ -24,8 +25,8 @@ uci commit system
 
 # 2. Установка Unbound
 DO_OPKG=1
-echo "[?] Установить Unbound? Нажмите ЛЮБУЮ клавишу за 5 сек для ОТМЕНЫ."
-if read -t 5 -n 1; then
+echo "[?] Установить Unbound? Нажмите ЛЮБУЮ клавишу за 15 сек для ОТМЕНЫ."
+if read -t 15 -n 1; then
     echo -e "\n[!] Шаг установки пропущен."
     DO_OPKG=0
 else
