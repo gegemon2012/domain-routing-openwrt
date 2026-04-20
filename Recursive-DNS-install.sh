@@ -39,7 +39,7 @@ fi
 echo "[3/4] Настройка Unbound и DNSSEC..."
 
 # Временный DNS, чтобы скачались ключи
-echo "nameserver 8.8.8.8" > /tmp/resolv.conf.auto
+echo "nameserver 77.88.8.8" > /tmp/resolv.conf.auto
 
 mkdir -p /var/lib/unbound
 
