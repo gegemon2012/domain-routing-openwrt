@@ -47,6 +47,10 @@ mkdir -p /var/lib/unbound
 unbound-anchor -a /var/lib/unbound/root.key || echo "Предупреждение: Ключ не скачан, проверьте интернет"
 
 # КРИТИЧНО: Права именно на файл ключа
+echo "Генерация ключей DNSSEC..."
+unbound-anchor -a /var/lib/unbound/root.key
+# Делаем паузу на секунду, чтобы ФС успела обновиться
+sleep 1 
 chown unbound:unbound /var/lib/unbound/root.key
 chmod 644 /var/lib/unbound/root.key
 
