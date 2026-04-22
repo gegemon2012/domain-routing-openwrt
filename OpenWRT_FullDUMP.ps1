@@ -1,17 +1,17 @@
-# openwrt_simple_backup_restore.ps1
+# openwrt_backup_restore.ps1
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "OpenWRT Backup & Restore Tool"
-$form.Width = 700
-$form.Height = 600
+$form.Width = 750
+$form.Height = 650
 $form.StartPosition = "CenterScreen"
 
 # Panel
 $panel = New-Object System.Windows.Forms.Panel
 $panel.Dock = "Top"
-$panel.Height = 150
+$panel.Height = 160
 $form.Controls.Add($panel)
 
 # IP
@@ -40,22 +40,17 @@ $txtUser.Width = 150
 $txtUser.Text = "root"
 $panel.Controls.Add($txtUser)
 
-# Password
-$lblPass = New-Object System.Windows.Forms.Label
-$lblPass.Text = "Password:"
-$lblPass.Location = New-Object System.Drawing.Point(10, 75)
-$lblPass.AutoSize = $true
-$panel.Controls.Add($lblPass)
-
-$txtPass = New-Object System.Windows.Forms.TextBox
-$txtPass.Location = New-Object System.Drawing.Point(100, 72)
-$txtPass.Width = 150
-$txtPass.UseSystemPasswordChar = $true
-$panel.Controls.Add($txtPass)
+# Info
+$lblInfo = New-Object System.Windows.Forms.Label
+$lblInfo.Text = "Password will be asked for each partition"
+$lblInfo.Location = New-Object System.Drawing.Point(100, 72)
+$lblInfo.Size = New-Object System.Drawing.Size(300, 20)
+$lblInfo.ForeColor = "Gray"
+$panel.Controls.Add($lblInfo)
 
 # Progress
 $progress = New-Object System.Windows.Forms.ProgressBar
-$progress.Location = New-Object System.Drawing.Point(10, 115)
+$progress.Location = New-Object System.Drawing.Point(10, 100)
 $progress.Width = 400
 $progress.Height = 20
 $panel.Controls.Add($progress)
@@ -65,23 +60,35 @@ $btnBackup = New-Object System.Windows.Forms.Button
 $btnBackup.Text = "Create Backup"
 $btnBackup.Location = New-Object System.Drawing.Point(440, 10)
 $btnBackup.Width = 220
-$btnBackup.Height = 35
+$btnBackup.Height = 40
 $btnBackup.BackColor = "LightGreen"
+$btnBackup.Font = New-Object System.Drawing.Font("Microsoft Sans Serif", 10, [System.Drawing.FontStyle]::Bold)
 $panel.Controls.Add($btnBackup)
 
-$btnRestore = New-Object System.Windows.Forms.Button
-$btnRestore.Text = "Restore from Backup"
-$btnRestore.Location = New-Object System.Drawing.Point(440, 55)
-$btnRestore.Width = 220
-$btnRestore.Height = 35
-$btnRestore.BackColor = "LightCoral"
-$panel.Controls.Add($btnRestore)
+$btnSafeRestore = New-Object System.Windows.Forms.Button
+$btnSafeRestore.Text = "Safe Restore"
+$btnSafeRestore.Location = New-Object System.Drawing.Point(440, 55)
+$btnSafeRestore.Width = 220
+$btnSafeRestore.Height = 35
+$btnSafeRestore.BackColor = "LightYellow"
+$btnSafeRestore.Font = New-Object System.Drawing.Font("Microsoft Sans Serif", 9, [System.Drawing.FontStyle]::Bold)
+$panel.Controls.Add($btnSafeRestore)
+
+$btnFullRestore = New-Object System.Windows.Forms.Button
+$btnFullRestore.Text = "Full Restore (DANGEROUS)"
+$btnFullRestore.Location = New-Object System.Drawing.Point(440, 95)
+$btnFullRestore.Width = 220
+$btnFullRestore.Height = 35
+$btnFullRestore.BackColor = "LightCoral"
+$btnFullRestore.Font = New-Object System.Drawing.Font("Microsoft Sans Serif", 9, [System.Drawing.FontStyle]::Bold)
+$btnFullRestore.ForeColor = "Red"
+$panel.Controls.Add($btnFullRestore)
 
 $btnClose = New-Object System.Windows.Forms.Button
 $btnClose.Text = "Close"
-$btnClose.Location = New-Object System.Drawing.Point(440, 100)
+$btnClose.Location = New-Object System.Drawing.Point(440, 135)
 $btnClose.Width = 220
-$btnClose.Height = 35
+$btnClose.Height = 25
 $panel.Controls.Add($btnClose)
 
 # Log
@@ -101,65 +108,38 @@ function Write-Log {
     $log.ScrollToCaret()
 }
 
-function Invoke-SSHCommand {
-    param($Command)
-    
-    $ip = $txtIP.Text
-    $user = $txtUser.Text
-    $pass = $txtPass.Text
-    
-    Write-Log "> $Command"
-    
-    try {
-        if ($pass -ne "") {
-            $result = & sshpass -p $pass ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no $user@$ip $Command 2>&1
-        } else {
-            $result = & ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no $user@$ip $Command 2>&1
-        }
-        return $result
-    }
-    catch {
-        Write-Log "ERROR: $_"
-        return $null
-    }
-}
-
-function Test-Connection {
-    Write-Log "Testing SSH connection..."
-    $result = Invoke-SSHCommand "echo OK"
-    
-    if ($result -match "OK") {
-        Write-Log "OK - Connected to router"
-        return $true
-    } else {
-        Write-Log "ERROR - Cannot connect to router"
-        Write-Log "Check IP, username and password (sshpass required for password auth)"
-        return $false
-    }
-}
-
 function Create-Backup {
     Write-Log ""
     Write-Log "=========================================="
     Write-Log "STARTING BACKUP"
     Write-Log "=========================================="
     
-    if (-not (Test-Connection)) { return }
+    $ip = $txtIP.Text
+    $user = $txtUser.Text
+    
+    # Папка в директории пользователя
+    $userFolder = $env:USERPROFILE
+    $backupBaseFolder = "$userFolder\OpenWRT_Backups"
+    
+    if (-not (Test-Path $backupBaseFolder)) {
+        New-Item -ItemType Directory -Path $backupBaseFolder -Force | Out-Null
+        Write-Log "Created folder: $backupBaseFolder"
+    }
     
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backupDir = "OpenWRT_Backup_$timestamp"
-    Write-Log "Creating folder: $backupDir"
+    $backupDir = "$backupBaseFolder\OpenWRT_Backup_$timestamp"
+    
+    Write-Log "Backup folder: $backupDir"
     New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
     
     Write-Log "Getting MTD partitions..."
-    $mtdList = Invoke-SSHCommand "cat /proc/mtd"
+    Write-Log ">>> You will be asked for password below <<<"
+    Write-Log ""
     
-    if ($mtdList) {
-        $mtdList | Out-File "$backupDir\mtd_list.txt"
-        Write-Log "MTD list saved"
-    }
+    $mtdList = & ssh $user@$ip "cat /proc/mtd" 2>&1
+    $mtdList | Out-File "$backupDir\mtd_list.txt"
+    Write-Log "MTD list saved"
     
-    # Find all mtd partitions
     $lines = $mtdList -split "`r`n"
     $partitions = @()
     
@@ -176,6 +156,11 @@ function Create-Backup {
     $total = $partitions.Count
     $current = 0
     
+    Write-Log ""
+    Write-Log "Found $total partitions"
+    Write-Log "=========================================="
+    Write-Log ""
+    
     foreach ($part in $partitions) {
         $current++
         $percent = [int](($current / $total) * 100)
@@ -185,9 +170,9 @@ function Create-Backup {
         $dumpFile = "$backupDir\$($part.Device)_$safeName.bin"
         
         Write-Log "[$current/$total] Dumping $($part.Device) ($($part.Name))..."
+        Write-Log ">>> Enter password when prompted <<<"
         
-        # Simple dump using dd
-        $dumpContent = Invoke-SSHCommand "dd if=/dev/$($part.Device) 2>/dev/null"
+        $dumpContent = & ssh $user@$ip "dd if=/dev/$($part.Device) 2>/dev/null" 2>&1
         
         if ($dumpContent) {
             $dumpContent | Out-File -FilePath $dumpFile -Encoding UTF8
@@ -196,187 +181,268 @@ function Create-Backup {
         } else {
             Write-Log "  WARNING: Empty dump"
         }
+        Write-Log ""
     }
-    
-    Write-Log "Creating archive..."
-    Compress-Archive -Path "$backupDir\*" -DestinationPath "$backupDir.zip" -Force
     
     Write-Log ""
     Write-Log "=========================================="
     Write-Log "BACKUP COMPLETE"
     Write-Log "=========================================="
-    Write-Log "File: $backupDir.zip"
+    Write-Log "Backup saved to: $backupDir"
+    Write-Log "Total partitions: $total"
+    Write-Log ""
     
     [System.Windows.Forms.MessageBox]::Show(
-        "Backup created successfully!`n`n$backupDir.zip", 
+        "Backup created successfully!`n`nFolder: $backupDir`n`nTotal partitions: $total", 
         "Success", "OK", "Information"
     )
     
     $progress.Value = 100
 }
 
+function Get-DangerousPartitions {
+    return @("art", "factory", "uboot", "u-boot", "bootloader", "nvram")
+}
+
+function Is-DangerousPartition {
+    param($PartitionName)
+    
+    $dangerous = Get-DangerousPartitions
+    foreach ($danger in $dangerous) {
+        if ($PartitionName -match $danger) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Restore-Backup {
+    param([bool]$SkipDangerous)
+    
+    $mode = if ($SkipDangerous) { "SAFE MODE (skip dangerous)" } else { "FULL MODE (ALL partitions)" }
+    
     Write-Log ""
     Write-Log "=========================================="
-    Write-Log "RESTORE OPERATION"
+    Write-Log "RESTORE FROM BACKUP - $mode"
     Write-Log "=========================================="
-    Write-Log "WARNING: This will write to router MTD partitions!"
     
-    # Select backup folder
+    if ($SkipDangerous) {
+        Write-Log "Safe mode: Dangerous partitions will be SKIPPED"
+        $dangerousList = (Get-DangerousPartitions) -join ", "
+        Write-Log "Dangerous partitions: $dangerousList"
+    } else {
+        Write-Log "FULL mode: ALL partitions will be restored (DANGEROUS!)"
+        Write-Log "This includes: art, factory, uboot, bootloader, nvram"
+    }
+    Write-Log ""
+    
+    # Выбираем папку с бэкапом
     $folder = New-Object System.Windows.Forms.FolderBrowserDialog
-    $folder.Description = "Select folder with backup files"
+    $folder.Description = "Select backup folder (contains .bin files)"
+    $folder.ShowNewFolderButton = $false
     
     if ($folder.ShowDialog() -ne "OK") {
-        Write-Log "Restore cancelled"
+        Write-Log "Restore cancelled by user"
         return
     }
     
     $backupDir = $folder.SelectedPath
-    Write-Log "Backup folder: $backupDir"
+    Write-Log "Selected backup folder: $backupDir"
     
-    # Check connection
-    if (-not (Test-Connection)) { return }
-    
-    # Get current MTD layout
-    Write-Log "Getting current MTD layout..."
-    $currentMtd = Invoke-SSHCommand "cat /proc/mtd"
-    
-    # Find backup files
+    # Проверяем наличие файлов
     $backupFiles = Get-ChildItem "$backupDir\*.bin" -ErrorAction SilentlyContinue
     
     if ($backupFiles.Count -eq 0) {
-        Write-Log "ERROR: No .bin files found in backup folder"
+        Write-Log "ERROR: No .bin files found in selected folder"
+        [System.Windows.Forms.MessageBox]::Show(
+            "No .bin files found in selected folder!", 
+            "Error", "OK", "Error"
+        )
         return
     }
     
     Write-Log "Found $($backupFiles.Count) backup files"
+    Write-Log ""
     
-    # Parse current partitions
+    $ip = $txtIP.Text
+    $user = $txtUser.Text
+    
+    # Получаем текущие разделы на роутере
+    Write-Log "Getting current MTD partitions from router..."
+    $currentMtd = & ssh $user@$ip "cat /proc/mtd" 2>&1
+    
+    # Парсим текущие разделы
     $currentParts = @{}
     $currentMtd -split "`r`n" | Where-Object { $_ -match "^mtd(\d+):.*""(.+)""" } | ForEach-Object {
         $currentParts[$matches[2]] = "mtd$($matches[1])"
     }
     
-    # Build restore list
-    $restoreItems = @()
+    # Собираем список для восстановления
+    $restoreList = @()
+    $skippedList = @()
     
     foreach ($file in $backupFiles) {
-        # Extract partition name from filename (format: mtdX_name.bin)
+        # Извлекаем имя раздела из имени файла (формат: mtdX_name.bin)
         if ($file.Name -match "mtd\d+_(.+)\.bin$") {
             $partName = $matches[1]
             
-            # Skip dangerous partitions
-            if ($partName -match "art|factory|uboot|bootloader|nvram|u-boot") {
-                Write-Log "SKIP - Protected partition: $partName"
+            # Проверяем опасность раздела
+            $isDangerous = Is-DangerousPartition -PartitionName $partName
+            
+            if ($SkipDangerous -and $isDangerous) {
+                $skippedList += $partName
+                Write-Log "SKIP - Dangerous partition (safe mode): $partName"
                 continue
             }
             
-            # Check if partition exists on router
+            if ($SkipDangerous -and -not $isDangerous) {
+                Write-Log "OK - Safe partition: $partName"
+            }
+            
+            if (-not $SkipDangerous) {
+                Write-Log "WARNING - Restoring $partName (including dangerous)"
+            }
+            
+            # Проверяем существует ли такой раздел на роутере
             if ($currentParts.ContainsKey($partName)) {
-                $restoreItems += @{
+                $restoreList += @{
                     Name = $partName
                     Device = $currentParts[$partName]
                     File = $file.FullName
-                    Size = $file.Length
+                    Size = [math]::Round($file.Length / 1KB, 2)
+                    IsDangerous = $isDangerous
                 }
-                Write-Log "Found: $partName -> $($currentParts[$partName])"
+                Write-Log "  -> $($currentParts[$partName]) ($($restoreList[-1].Size) KB)"
             } else {
-                Write-Log "SKIP - Partition not found: $partName"
+                Write-Log "SKIP - Partition not found on router: $partName"
             }
         }
     }
     
-    if ($restoreItems.Count -eq 0) {
-        Write-Log "ERROR: No matching partitions found for restore"
+    if ($restoreList.Count -eq 0) {
+        Write-Log ""
+        Write-Log "ERROR: No partitions to restore"
+        [System.Windows.Forms.MessageBox]::Show(
+            "No partitions to restore!", 
+            "Error", "OK", "Error"
+        )
         return
     }
     
-    # Show restore plan
     Write-Log ""
+    Write-Log "=========================================="
     Write-Log "Partitions to restore:"
-    foreach ($item in $restoreItems) {
-        $sizeKB = [math]::Round($item.Size / 1KB, 2)
-        Write-Log "  - $($item.Name) -> $($item.Device) ($sizeKB KB)"
+    foreach ($item in $restoreList) {
+        $dangerMark = if ($item.IsDangerous) { " [DANGEROUS]" } else { "" }
+        Write-Log "  - $($item.Name) -> $($item.Device) ($($item.Size) KB)$dangerMark"
     }
     
-    # First confirmation
-    $confirm = [System.Windows.Forms.MessageBox]::Show(
-        "WARNING!`n`nYou are about to restore $($restoreItems.Count) partition(s).`nThis can DAMAGE your router if wrong!`n`nContinue?",
-        "Confirm Restore",
+    if ($skippedList.Count -gt 0) {
+        Write-Log ""
+        Write-Log "Skipped partitions (dangerous):"
+        foreach ($skip in $skippedList) {
+            Write-Log "  - $skip"
+        }
+    }
+    Write-Log "=========================================="
+    Write-Log ""
+    
+    # Подтверждение в зависимости от режима
+    if ($SkipDangerous) {
+        $confirmMsg = "Safe Restore`n`nYou are about to restore $($restoreList.Count) partition(s).`nDangerous partitions will be skipped.`n`nContinue?"
+        $confirmTitle = "Confirm Safe Restore"
+    } else {
+        $confirmMsg = "FULL RESTORE - DANGEROUS!`n`nYou are about to restore $($restoreList.Count) partition(s).`nThis INCLUDES dangerous partitions (art, uboot, etc).`nTHIS CAN BRICK YOUR ROUTER!`n`nContinue?"
+        $confirmTitle = "DANGEROUS - Confirm Full Restore"
+    }
+    
+    $confirm1 = [System.Windows.Forms.MessageBox]::Show(
+        $confirmMsg,
+        $confirmTitle,
         "YesNo",
         "Warning"
     )
     
-    if ($confirm -ne "Yes") {
-        Write-Log "Restore cancelled"
+    if ($confirm1 -ne "Yes") {
+        Write-Log "Restore cancelled by user"
         return
     }
     
-    # Second confirmation
-    $confirm2 = [System.Windows.Forms.MessageBox]::Show(
-        "FINAL WARNING!`n`nAre you ABSOLUTELY sure?`nThis will write directly to MTD devices!",
-        "Final Confirmation",
-        "YesNo",
-        "Error"
-    )
-    
-    if ($confirm2 -ne "Yes") {
-        Write-Log "Restore cancelled"
-        return
+    # Второе подтверждение для полного восстановления
+    if (-not $SkipDangerous) {
+        $confirm2 = [System.Windows.Forms.MessageBox]::Show(
+            "FINAL WARNING!`n`nYou are about to restore dangerous partitions!`nThis can permanently damage your router!`n`nType 'YES' to continue",
+            "FINAL CONFIRMATION - FULL RESTORE",
+            "YesNo",
+            "Error"
+        )
+        
+        if ($confirm2 -ne "Yes") {
+            Write-Log "Restore cancelled by user"
+            return
+        }
     }
     
-    # Perform restore
     Write-Log ""
-    Write-Log "Starting restore..."
-    $total = $restoreItems.Count
+    Write-Log "Starting restore operation..."
+    Write-Log ">>> You will be asked for password for each partition <<<"
+    Write-Log ""
+    
+    $total = $restoreList.Count
     $current = 0
     
-    foreach ($item in $restoreItems) {
+    foreach ($item in $restoreList) {
         $current++
         $percent = [int](($current / $total) * 100)
         $progress.Value = $percent
         
-        Write-Log "[$current/$total] Restoring $($item.Name)..."
+        $dangerWarning = if ($item.IsDangerous) { " [DANGEROUS PARTITION!]" } else { "" }
+        Write-Log "[$current/$total] Restoring $($item.Name) to $($item.Device)$dangerWarning"
+        Write-Log ">>> Enter password when prompted <<<"
         
-        # Read the backup file
+        # Читаем файл бэкапа
         $backupData = Get-Content $item.File -Raw -Encoding UTF8
         
         if ($backupData) {
-            # Simple restore using echo through SSH
-            Write-Log "  Writing to $($item.Device)..."
-            
-            # Escape special characters
+            # Экранируем спецсимволы
             $escapedData = $backupData -replace "'", "'\\''"
             
-            # Write to MTD
-            $result = Invoke-SSHCommand "echo '$escapedData' | dd of=/dev/$($item.Device) 2>/dev/null && echo 'OK'"
+            # Восстанавливаем через SSH
+            $result = & ssh $user@$ip "echo '$escapedData' | dd of=/dev/$($item.Device) 2>/dev/null && echo 'OK'" 2>&1
             
             if ($result -match "OK") {
                 Write-Log "  OK - Restored successfully"
             } else {
-                Write-Log "  ERROR - Restore failed"
+                Write-Log "  ERROR - Restore failed: $result"
             }
         } else {
             Write-Log "  ERROR - Cannot read backup file"
         }
+        Write-Log ""
     }
     
     Write-Log ""
     Write-Log "=========================================="
     Write-Log "RESTORE COMPLETE"
     Write-Log "=========================================="
-    Write-Log "IMPORTANT: Reboot router to apply changes"
+    Write-Log "Restored $total partitions"
+    
+    if ($skippedList.Count -gt 0) {
+        Write-Log "Skipped $($skippedList.Count) dangerous partitions"
+    }
+    Write-Log ""
+    Write-Log "IMPORTANT: Reboot router to apply changes!"
     
     $reboot = [System.Windows.Forms.MessageBox]::Show(
-        "Restore finished!`n`nReboot router now?",
-        "Reboot",
+        "Restore completed!`n`nReboot router now?",
+        "Reboot Required",
         "YesNo",
         "Question"
     )
     
     if ($reboot -eq "Yes") {
         Write-Log "Rebooting router..."
-        Invoke-SSHCommand "reboot"
+        & ssh $user@$ip "reboot" 2>&1
         Write-Log "Reboot command sent"
     }
     
@@ -384,23 +450,52 @@ function Restore-Backup {
 }
 
 # Button handlers
-$btnBackup.Add_Click({ Create-Backup })
-$btnRestore.Add_Click({ Restore-Backup })
+$btnBackup.Add_Click({ 
+    try {
+        Create-Backup
+    } catch {
+        Write-Log "ERROR: $_"
+    }
+})
+
+$btnSafeRestore.Add_Click({ 
+    try {
+        Restore-Backup -SkipDangerous $true
+    } catch {
+        Write-Log "ERROR: $_"
+    }
+})
+
+$btnFullRestore.Add_Click({ 
+    try {
+        Restore-Backup -SkipDangerous $false
+    } catch {
+        Write-Log "ERROR: $_"
+    }
+})
+
 $btnClose.Add_Click({ $form.Close() })
 
 # Startup info
+Write-Log "=========================================="
 Write-Log "OpenWRT Backup & Restore Tool"
 Write-Log "=========================================="
-Write-Log "Backup - Safe, creates full router backup"
-Write-Log "Restore - DANGEROUS, restores from backup"
-Write-Log "=========================================="
 Write-Log ""
-Write-Log "Protected partitions (skipped):"
-Write-Log "  art, factory, uboot, bootloader, nvram"
+Write-Log "BACKUP:"
+Write-Log "  - Creates full backup of ALL MTD partitions"
+Write-Log "  - Saves to: %USERPROFILE%\OpenWRT_Backups\"
 Write-Log ""
-Write-Log "Requirements:"
-Write-Log "  - SSH access to router"
-Write-Log "  - sshpass for password authentication"
+Write-Log "SAFE RESTORE:"
+Write-Log "  - Restores only SAFE partitions"
+Write-Log "  - Skips: art, factory, uboot, bootloader, nvram"
+Write-Log "  - Recommended for normal use"
+Write-Log ""
+Write-Log "FULL RESTORE (DANGEROUS):"
+Write-Log "  - Restores ALL partitions including dangerous"
+Write-Log "  - Can brick your router!"
+Write-Log "  - Use only if you know what you're doing"
+Write-Log ""
+Write-Log "Password will be asked for each partition"
 Write-Log "=========================================="
 
 $form.ShowDialog()
