@@ -20,7 +20,7 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/LuCI-HTTPS-install.sh)
 ```
 
-# Скрипт для установки Рекурсивного DNS (для Ruantiblock и Get domains AWG 2.0)
+# Скрипт для установки Рекурсивного DNS + HTTPS DNS Proxy (для Ruantiblock и Get domains AWG 2.0)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Recursive-DNS-install.sh)
 ```
