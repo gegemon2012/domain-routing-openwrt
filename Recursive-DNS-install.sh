@@ -24,9 +24,10 @@ echo "[?] Установить пакеты? Нажмите ЛЮБУЮ клав�
 if read -t 15 -n 1; then
     echo -e "\n[!] Шаг установки пропущен."
 else
-    echo -e "\n[2/4] Обновление и установка Unbound..."
+    echo -e "\n[2/4] Обновление и установка пакетов..."
     opkg update
-    opkg install unbound-daemon luci-app-unbound bind-dig unbound-anchor
+    opkg install unbound-daemon luci-app-unbound bind-dig unbound-anchor \
+    https-dns-proxy luci-app-https-dns-proxy
 fi
 
 # 3. Настройка Unbound без обязательного интернета
@@ -58,20 +59,26 @@ uci commit unbound
 /etc/init.d/unbound restart
 
 # 4. Привязка к Dnsmasq (с приоритетом и Quad9)
-echo "[4/4] Настройка приоритетов Dnsmasq..."
+echo "[4/4] Настройка цепочки DNS (Unbound -> DoH -> Quad9)..."
 
-# Очистка текущих DNS
+# Очистка текущих DNS серверов
 while uci get dhcp.@dnsmasq[0].server >/dev/null 2>&1; do
     uci del_list dhcp.@dnsmasq[0].server=$(uci get dhcp.@dnsmasq[0].server | head -n 1)
 done
 
-# Приоритет: 1. Unbound (локальный), 2. Quad9 (резерв)
-uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5353'
-uci add_list dhcp.@dnsmasq[0].server='9.9.9.9' 
+# Настройка https-dns-proxy на порт 5053 (по умолчанию для Google/Cloudflare)
+# Обычно пакет уже настроен на Google/Cloudflare, но мы убедимся в запуске
+/etc/init.d/https-dns-proxy enable
+/etc/init.d/https-dns-proxy restart
+
+# Приоритеты в Dnsmasq
+uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5353' # Unbound
+uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5053' # DoH (Cloudflare)
+uci add_list dhcp.@dnsmasq[0].server='127.0.0.1#5054' # DoH (Google)
+uci add_list dhcp.@dnsmasq[0].server='9.9.9.9'        # Резервный IP (Quad9)
 
 uci set dhcp.@dnsmasq[0].strictorder='1' # Опрос строго по порядку
 uci set dhcp.@dnsmasq[0].noresolv='1'
-uci set dhcp.@dnsmasq[0].cachesize='1000'
 uci commit dhcp
 
 /etc/init.d/unbound restart
