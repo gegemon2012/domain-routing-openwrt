@@ -11,7 +11,7 @@ else
     echo -e "\n[+] Обновление и установка..."
     opkg update
     # Используем standalone версию для экономии места и независимости от библиотек
-    opkg install luci-ssl px5g-standalone luci-app-uhttpd
+    opkg install luci-ssl px5g-mbedtls luci-app-uhttpd
 fi
 
 # 2. Сбор данных для сертификата
