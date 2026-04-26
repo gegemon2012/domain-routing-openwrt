@@ -17,12 +17,15 @@ foreach ($file in $lstFiles) {
         $_.Trim() -ne "" -and $_ -notmatch "^\s*#" -and $_ -match "\."
     }
     
-    $uniqueIps = $lines | ForEach-Object { $_.Trim() } | Sort-Object -Unique
+    # Убираем кавычки в начале и/или в конце каждой строки
+    $cleanIps = $lines | ForEach-Object { 
+        $_.Trim() -replace '^"', '' -replace '"$', ''
+    } | Sort-Object -Unique
     
-    # Убираем -Compress для красивого форматирования
-    $uniqueIps | ConvertTo-Json | Set-Content $outputFile -Encoding UTF8
+    # Конвертируем очищенные строки в JSON
+    $cleanIps | ConvertTo-Json | Set-Content $outputFile -Encoding UTF8
     
-    Write-Host "OK: $($file.Name) -> $outputFile ($($uniqueIps.Count) entries)" -ForegroundColor Green
+    Write-Host "OK: $($file.Name) -> $outputFile ($($cleanIps.Count) entries)" -ForegroundColor Green
 }
 
 Write-Host "`nDone." -ForegroundColor Cyan
