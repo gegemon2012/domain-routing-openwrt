@@ -680,23 +680,67 @@ run_startup() {
 show_menu() {
     while true; do
         clear
-        echo -e "${MAGENTA}WARP Manager v${WARP_VERSION}${NC}\n"
-        echo -e "  1) Установить WARP (AWG)"
-        echo -e "  2) Запустить / Остановить бота"
+        echo -e "${MAGENTA}WARP Manager v${WARP_VERSION} — SECURE EDITION${NC}\n"
+        
+        # Определяем текущий статус для красоты
+        local w_status="${RED}Отключен${NC}"
+        if has_awg_mode && is_warp_running_awg; then w_status="${GREEN}Подключен (AWG)${NC}"; fi
+        if has_3xui_mode && is_warp_running_3xui; then w_status="${GREEN}Подключен (3X-UI)${NC}"; fi
+        
+        local b_status="${RED}Остановлен${NC}"
+        if systemctl is-active --quiet warp-bot 2>/dev/null; then b_status="${GREEN}Работает${NC}"; fi
+
+        echo -e "  Статус WARP: ${w_status}"
+        echo -e "  Статус Бота: ${b_status}\n"
+        
+        echo -e "  1) Установить WARP"
+        echo -e "  2) Удалить WARP"
+        echo -e "  3) Запустить WARP"
+        echo -e "  4) Остановить WARP"
+        echo -e "  5) Обновить ключ WARP (Перевыпуск)"
+        echo -e "  6) Управление Telegram-ботом (Запуск / Остановка)"
         echo -e "  0) Выход"
-        read -p "Выбор: " ch
+        echo ""
+        read -p "  Выбор: " ch
+        
         case $ch in
-            1) install_warp_awg ;;
-            2) start_bot ;;
-            0) exit 0 ;;
+            1) 
+                if has_awg_mode; then install_warp_awg; else install_warp_3xui; fi 
+                ;;
+            2) 
+                echo -e "\n${YELLOW}Удаление WARP...${NC}"
+                if has_awg_mode; then uninstall_awg; else uninstall_3xui; fi
+                echo -e "${GREEN}[OK] WARP удален.${NC}"
+                read -p "Enter..." 
+                ;;
+            3) 
+                if has_awg_mode; then start_warp_awg; else start_warp_3xui; fi 
+                ;;
+            4) 
+                if has_awg_mode; then stop_warp_awg; else stop_warp_3xui; fi 
+                ;;
+            5) 
+                if has_awg_mode; then rekey_warp_awg; else rekey_warp_3xui; fi 
+                ;;
+            6) 
+                if systemctl is-active --quiet warp-bot 2>/dev/null; then
+                    echo -e "\n${YELLOW}Остановка бота...${NC}"
+                    stop_bot
+                    echo -e "${GREEN}[OK] Бот остановлен.${NC}"
+                else
+                    echo -e "\n${YELLOW}Запуск бота...${NC}"
+                    start_bot
+                fi
+                read -p "Enter..."
+                ;;
+            0) 
+                clear
+                exit 0 
+                ;;
+            *) 
+                echo -e "${RED}Неверный ввод.${NC}"
+                sleep 1 
+                ;;
         esac
     done
 }
-
-has_3xui_mode() { [[ "$MODE" == "3xui" || "$MODE" == "both" ]]; }
-has_awg_mode()  { [[ "$MODE" == "amnezia" || "$MODE" == "both" ]]; }
-
-case "${1:-}" in
-    --bot-daemon) init_config; bot_daemon ;;
-    *) init_config; run_startup ;;
-esac
