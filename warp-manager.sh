@@ -267,7 +267,7 @@ install_warp_3xui() {
         log_action "3XUI INSTALL: port=${SOCKS_PORT}, warp_ip=${wip}"
     else
         echo -e "${YELLOW}  ⚠ Подключение не подтверждено.${NC}"
-    fi>
+    fi
     echo -e "\n${WHITE}Настройка 3X-UI: п.${YELLOW}6${WHITE} (JSON, инструкция, порт)${NC}"
     read -p "Enter..."
 }
