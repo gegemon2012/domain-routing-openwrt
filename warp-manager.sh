@@ -1716,6 +1716,7 @@ show_menu() {
         local st sc
         st=$(get_warp_status)
         sc="$RED"; [[ "$st" == *"Подключён"* ]] && sc="$GREEN"; [[ "$st" == *"Отключён"* && "$st" != *"Подключён"* ]] && sc="$YELLOW"
+
         local mode_label="3X-UI"
         [ "$MODE" = "amnezia" ] && mode_label="AmneziaWG"
         [ "$MODE" = "both" ] && mode_label="3X-UI + AmneziaWG"
@@ -1725,57 +1726,69 @@ show_menu() {
         echo -e "${MAGENTA}══════════════════════════════════════════════════════${NC}"
         echo -e "  ${WHITE}IP сервера:${NC} ${GREEN}${MY_IP}${NC}   ${WHITE}Режим:${NC} ${CYAN}${mode_label}${NC}"
         echo -e "  ${WHITE}WARP:${NC} ${sc}${st}${NC}"
-        if has_3xui_mode && is_warp_running_3xui 2>/dev/null; then
-            echo -e "  ${WHITE}SOCKS5:${NC} ${CYAN}127.0.0.1:${SOCKS_PORT}${NC}"
-        fi
-        if has_awg_mode && [ -n "${CONTAINER:-}" ]; then
-            echo -e "  ${WHITE}Контейнер:${NC} ${CYAN}${CONTAINER}${NC}"
-        fi
 
-        echo -e "\n${CYAN}── WARP-ключ ──────────────────────────────────────────${NC}"
-        echo -e "  1) ${GREEN}Установить WARP${NC}"
-        echo -e "  2) ${CYAN}Запустить WARP${NC}"
-        echo -e "  3) ${YELLOW}Остановить WARP${NC}"
-        echo -e "  4) 📊 Статус"
-        echo -e "  5) 🔑 ${YELLOW}Перевыпуск ключа${NC}"
+        local n=1
+
+        echo -e "\n${CYAN}── Базовые действия ───────────────────────────────────${NC}"
+        echo -e "  $((n++))) ${GREEN}Установить WARP${NC}"
+        echo -e "  $((n++))) ${CYAN}Запустить WARP${NC}"
+        echo -e "  $((n++))) ${YELLOW}Остановить WARP${NC}"
+        echo -e "  $((n++))) 📊 Статус"
+        echo -e "  $((n++))) 🔑 Перевыпуск ключа"
 
         if has_3xui_mode; then
             echo -e "\n${CYAN}── 3X-UI ──────────────────────────────────────────────${NC}"
-            echo -e "  6) 📋 ${CYAN}Настройки SOCKS5 / JSON / Инструкция${NC}"
+            echo -e "  $((n++))) 📋 Настройки SOCKS5 / JSON / Инструкция"
         fi
 
         if has_awg_mode; then
             echo -e "\n${CYAN}── AmneziaWG ──────────────────────────────────────────${NC}"
-            echo -e "  7) 👥 ${GREEN}Управление клиентами WARP${NC}"
+            echo -e "  $((n++))) 👥 Управление клиентами WARP"
         fi
 
         echo -e "\n${CYAN}── Telegram-бот ───────────────────────────────────────${NC}"
-        echo -e "  8) 🤖 ${CYAN}Настройка и управление ботом${NC}"
+        echo -e "  $((n++))) 🤖 Настройка и управление ботом"
 
         echo -e "\n${CYAN}── Прочее ─────────────────────────────────────────────${NC}"
-        echo -e "  9) ${MAGENTA}📚 Инструкция${NC}"
-        echo -e " 10) ${RED}⚠  Полное удаление${NC}"
+        echo -e "  $((n++))) 📚 Инструкция"
+        echo -e "  $((n++))) ${RED}⚠  Полное удаление${NC}"
         echo -e "  0) Выход"
         echo -e "${CYAN}──────────────────────────────────────────────────────${NC}"
+
         read -p "  Выбор: " ch
 
+        local i=1
+
         case $ch in
-            1)  if has_3xui_mode; then install_warp_3xui; fi
-                if has_awg_mode; then install_warp_awg; fi ;;
-            2)  if has_3xui_mode; then start_warp_3xui; fi
-                if has_awg_mode; then start_warp_awg; fi ;;
-            3)  if has_3xui_mode; then stop_warp_3xui; fi
-                if has_awg_mode; then stop_warp_awg; fi ;;
-            4)  if has_3xui_mode; then show_status_3xui; fi
-                if has_awg_mode; then show_status_awg; fi ;;
-            5)  if has_3xui_mode; then rekey_warp_3xui; fi
-                if has_awg_mode; then rekey_warp_awg; fi ;;
-            6)  has_3xui_mode && show_3xui_menu ;;
-            7)  has_awg_mode && awg_toggle_clients_ssh ;;
-            8)  bot_menu ;;
-            9)  show_info ;;
-            10) full_uninstall ;;
-            0)  exit 0 ;;
+            $((i++))) if has_3xui_mode; then install_warp_3xui; fi
+                      if has_awg_mode; then install_warp_awg; fi ;;
+            $((i++))) if has_3xui_mode; then start_warp_3xui; fi
+                      if has_awg_mode; then start_warp_awg; fi ;;
+            $((i++))) if has_3xui_mode; then stop_warp_3xui; fi
+                      if has_awg_mode; then stop_warp_awg; fi ;;
+            $((i++))) if has_3xui_mode; then show_status_3xui; fi
+                      if has_awg_mode; then show_status_awg; fi ;;
+            $((i++))) if has_3xui_mode; then rekey_warp_3xui; fi
+                      if has_awg_mode; then rekey_warp_awg; fi ;;
+        esac
+
+        if has_3xui_mode; then
+            case $ch in
+                $((i++))) show_3xui_menu ;;
+            esac
+        fi
+
+        if has_awg_mode; then
+            case $ch in
+                $((i++))) awg_toggle_clients_ssh ;;
+            esac
+        fi
+
+        case $ch in
+            $((i++))) bot_menu ;;
+            $((i++))) show_info ;;
+            $((i++))) full_uninstall ;;
+            0) exit 0 ;;
         esac
     done
 }
