@@ -546,41 +546,53 @@ awg_pick_container() {
 }
 
 awg_load_container_data() {
-    # 1. Сначала подгружаем имена из файла клиентов, если он есть
-    # Это исправит пустое отображение имен в меню
-    AWG_CLIENT_IPS=()
+    # 1. Сначала загружаем имена пользователей из файла
+    # Используем declare -g для глобального массива, если скрипт поддерживает ассоциативные массивы
     if [ -f "$AWG_WARP_CLIENTS" ]; then
-        # Читаем файл построчно: Имя IP
-        while read -r name ip; do
-            [[ -z "$name" || -z "$ip" ]] && continue
+        # Очищаем старые данные перед чтением
+        unset AWG_CLIENT_NAMES
+        declare -g -A AWG_CLIENT_NAMES
+        AWG_CLIENT_IPS=()
+        
+        while read -r name ip || [ -n "$name" ]; do
+            [[ -z "$name" || -z "$ip" || "$name" == "#"* ]] && continue
             AWG_CLIENT_IPS+=("$ip")
             AWG_CLIENT_NAMES["$ip"]="$name"
         done < "$AWG_WARP_CLIENTS"
     fi
 
-    # 2. Определяем пути внутри контейнера
-    if [ "$CONTAINER" = "amnezia-awg2" ]; then
-        AWG_VPN_CONF="/opt/amnezia/awg/awg0.conf"
-        AWG_VPN_IF="awg0"
-        AWG_VPN_QUICK_CMD="awg-quick"
-    else
-        AWG_VPN_CONF="/opt/amnezia/awg/wg0.conf"
-        AWG_VPN_IF="wg0"
-        AWG_VPN_QUICK_CMD="wg-quick"
+    # 2. Определяем пути к конфигурации внутри контейнера
+    # Проверяем стандартные пути AmneziaWG
+    local paths_to_check=("/opt/amnezia/awg/wg0.conf" "/opt/amnezia/awg/awg0.conf" "/etc/amnezia/amnezia-awg.conf")
+    local found_conf=""
+
+    for p in "${paths_to_check[@]}"; do
+        if docker exec "$CONTAINER" [ -f "$p" ] 2>/dev/null; then
+            found_conf="$p"
+            break
+        fi
+    done
+
+    if [ -z "$found_conf" ]; then
+        echo -e "${RED}Ошибка: Конфигурация VPN не найдена в контейнере $CONTAINER${NC}"
+        # Вместо return используем обход логики, чтобы не вызывать ошибку bash
+        return 1
     fi
 
-    AWG_CLIENTS_TABLE="/opt/amnezia/awg/clientsTable"
-    AWG_START_SH="/opt/amnezia/start.sh"
+    AWG_VPN_CONF="$found_conf"
+    
+    # Определяем интерфейс (wg0 или awg0)
+    if [[ "$AWG_VPN_CONF" == *"awg0"* ]]; then
+        AWG_VPN_IF="awg0"
+    else
+        AWG_VPN_IF="wg0"
+    fi
 
-    # 3. Проверка существования конфига в контейнере
-    docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
-        for f in /opt/amnezia/awg/wg0.conf /opt/amnezia/awg/awg0.conf /etc/wireguard/wg0.conf; do
-            if docker exec "$CONTAINER" sh -c "[ -f '$f' ]" 2>/dev/null; then
-                AWG_VPN_CONF="$f"
-                break
-            fi
-        done
-    }
+    # 3. Получаем подсеть (Address)
+    AWG_SUBNET=$(docker exec "$CONTAINER" grep -m1 "Address =" "$AWG_VPN_CONF" | awk '{print $3}' | cut -d',' -f1)
+    
+    return 0
+}
 
     docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
         echo -e "${RED}Не найден конфиг VPN в контейнере: $AWG_VPN_CONF${NC}"
