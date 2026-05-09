@@ -546,21 +546,51 @@ awg_pick_container() {
 }
 
 awg_load_container_data() {
-    # Убеждаемся, что файл существует и читаем
-    if [ ! -f "$AWG_WARP_CLIENTS" ]; then
-        touch "$AWG_WARP_CLIENTS"
-        chmod 644 "$AWG_WARP_CLIENTS"
+    # 1. Сначала подгружаем имена из файла клиентов, если он есть
+    # Это исправит пустое отображение имен в меню
+    AWG_CLIENT_IPS=()
+    if [ -f "$AWG_WARP_CLIENTS" ]; then
+        # Читаем файл построчно: Имя IP
+        while read -r name ip; do
+            [[ -z "$name" || -z "$ip" ]] && continue
+            AWG_CLIENT_IPS+=("$ip")
+            AWG_CLIENT_NAMES["$ip"]="$name"
+        done < "$AWG_WARP_CLIENTS"
     fi
 
-    AWG_CLIENT_IPS=()
-    # Загружаем имена из файла в ассоциативный массив
-    while read -r name ip; do
-        [[ -z "$name" || -z "$ip" ]] && continue
-        AWG_CLIENT_IPS+=("$ip")
-        AWG_CLIENT_NAMES["$ip"]="$name"
-    done < "$AWG_WARP_CLIENTS"
-}
+    # 2. Определяем пути внутри контейнера
+    if [ "$CONTAINER" = "amnezia-awg2" ]; then
+        AWG_VPN_CONF="/opt/amnezia/awg/awg0.conf"
+        AWG_VPN_IF="awg0"
+        AWG_VPN_QUICK_CMD="awg-quick"
+    else
+        AWG_VPN_CONF="/opt/amnezia/awg/wg0.conf"
+        AWG_VPN_IF="wg0"
+        AWG_VPN_QUICK_CMD="wg-quick"
+    fi
 
+    AWG_CLIENTS_TABLE="/opt/amnezia/awg/clientsTable"
+    AWG_START_SH="/opt/amnezia/start.sh"
+
+    # 3. Проверка существования конфига в контейнере
+    docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
+        for f in /opt/amnezia/awg/wg0.conf /opt/amnezia/awg/awg0.conf /etc/wireguard/wg0.conf; do
+            if docker exec "$CONTAINER" sh -c "[ -f '$f' ]" 2>/dev/null; then
+                AWG_VPN_CONF="$f"
+                break
+            fi
+        done
+    }
+
+    docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
+        echo -e "${RED}Не найден конфиг VPN в контейнере: $AWG_VPN_CONF${NC}"
+        return 1
+    }
+
+    # 4. Получаем подсеть
+    AWG_SUBNET=$(docker exec "$CONTAINER" sh -c "sed -n 's/^Address = \(.*\)$/\1/p' '$AWG_VPN_CONF' | head -n1 | cut -d',' -f1" 2>/dev/null | tr -d '\r')
+    return 0
+}
     docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
         echo -e "${RED}Не найден конфиг VPN в контейнере: $AWG_VPN_CONF${NC}"
         return 1
