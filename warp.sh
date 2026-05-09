@@ -546,27 +546,20 @@ awg_pick_container() {
 }
 
 awg_load_container_data() {
-    if [ "$CONTAINER" = "amnezia-awg2" ]; then
-        AWG_VPN_CONF="/opt/amnezia/awg/awg0.conf"
-        AWG_VPN_IF="awg0"
-        AWG_VPN_QUICK_CMD="awg-quick"
-    else
-        AWG_VPN_CONF="/opt/amnezia/awg/wg0.conf"
-        AWG_VPN_IF="wg0"
-        AWG_VPN_QUICK_CMD="wg-quick"
+    # Убеждаемся, что файл существует и читаем
+    if [ ! -f "$AWG_WARP_CLIENTS" ]; then
+        touch "$AWG_WARP_CLIENTS"
+        chmod 644 "$AWG_WARP_CLIENTS"
     fi
 
-    AWG_CLIENTS_TABLE="/opt/amnezia/awg/clientsTable"
-    AWG_START_SH="/opt/amnezia/start.sh"
-
-    docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
-        for f in /opt/amnezia/awg/wg0.conf /opt/amnezia/awg/awg0.conf /etc/wireguard/wg0.conf; do
-            if docker exec "$CONTAINER" sh -c "[ -f '$f' ]" 2>/dev/null; then
-                AWG_VPN_CONF="$f"
-                break
-            fi
-        done
-    }
+    AWG_CLIENT_IPS=()
+    # Загружаем имена из файла в ассоциативный массив
+    while read -r name ip; do
+        [[ -z "$name" || -z "$ip" ]] && continue
+        AWG_CLIENT_IPS+=("$ip")
+        AWG_CLIENT_NAMES["$ip"]="$name"
+    done < "$AWG_WARP_CLIENTS"
+}
 
     docker exec "$CONTAINER" sh -c "[ -f '$AWG_VPN_CONF' ]" 2>/dev/null || {
         echo -e "${RED}Не найден конфиг VPN в контейнере: $AWG_VPN_CONF${NC}"
