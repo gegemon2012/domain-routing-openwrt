@@ -50,11 +50,6 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/ruantiblock-tor-snowflake.sh)
 ```
 
-# Скрипт для установки WARP Manager (test)
-```
-bash <(curl -fsSL https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/warp.sh)
-```
-
 ## AmneziaWG
 Через этот скрипт можно установить Amnezia wireguard. Скрипт проверяет наличие пакетов под вашу платформу в [стороннем репозитории](https://github.com/Slava-Shchipunov/awg-openwrt/releases), так как в официальном репозитории OpenWRT они отсутствуют, и автоматически их устанавливает.
 
