@@ -10,7 +10,7 @@ WARP_CONF="$WARP_DIR/config"
 WARP_LOG="/var/log/warp-manager.log"
 
 WGCF_BIN="/root/wgcf"
-WGCF_VERSION="latest"   # фактическая версия берётся из GitHub API
+WGCF_VERSION="latest"
 
 AWG_WARP_DIR="/opt/warp"
 AWG_WARP_CONF="$AWG_WARP_DIR/warp.conf"
@@ -154,8 +154,8 @@ wgcf_fetch_latest() {
 
     local tag asset_bin asset_sha
     tag=$(echo "$json" | jq -r '.tag_name') || die "Не удалось получить tag_name"
-    asset_bin=$(echo "$json" | jq -r '.assets[].browser_download_url | select(contains("linux_amd64"))')
-    asset_sha=$(echo "$json" | jq -r '.assets[].browser_download_url | select(endswith("sha256"))')
+    asset_bin=$(echo "$json" | jq -r '.assets[].browser_download_url | select(contains(\"linux_amd64\"))')
+    asset_sha=$(echo "$json" | jq -r '.assets[].browser_download_url | select(endswith(\"sha256\"))')
 
     [[ -z "$asset_bin" ]] && die "Не найден бинарник wgcf"
     [[ -z "$asset_sha" ]] && die "Не найден файл sha256"
@@ -298,7 +298,7 @@ show_3xui_guide() {
     echo -e "   - port: ${SOCKS_PORT}"
     echo
     echo -e "3. В Routing Rules добавь правило с outboundTag: warp и доменами (см. JSON выше)."
-    echo -e "4. Перезапусти Xray."
+    echo -е "4. Перезапусти Xray."
     echo
 }
 
@@ -461,7 +461,7 @@ menu_awg() {
     check_root; check_deps; init_config
     while true; do
         clear
-        echo -е "${CYAN}AmneziaWG / WARP внутри контейнера${NC}\n"
+        echo -e "${CYAN}AmneziaWG / WARP внутри контейнера${NC}\n"
         echo "1) Установить/настроить WARP (warp-интерфейс)"
         echo "2) Обновить wgcf + перезапустить warp"
         echo "3) Показать список клиентов AmneziaWG"
