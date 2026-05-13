@@ -52,7 +52,7 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 
 # Скрипт для установки WARP-Manager (test)
 ```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/warp.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/warp.sh)
 ```
 
 ## AmneziaWG
