@@ -30,12 +30,12 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/Zerotier-install.sh)
 ```
 
-# Скрипт для установки Get domains AWG 2.0
+# Скрипт для установки Get domains AWG 2.0 (ipset)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
 
-# Скрипт для установки Get domains AWG 2.0 (test)
+# Скрипт для установки Get domains AWG 2.0 (nftset)
 ```
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install2.sh)
 ```
