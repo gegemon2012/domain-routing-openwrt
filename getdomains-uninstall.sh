@@ -12,8 +12,7 @@ sed -i '/getdomains start/d' /etc/crontabs/root
 echo "Выпиливаем домены"
 rm -f /tmp/dnsmasq.d/domains.lst
 
-echo "Чистим firewall, раз раз 🍴"
-
+echo "Чистим firewall (ipset)"
 ipset_id=$(uci show firewall | grep -E '@ipset.*name=.vpn_domains.' | awk -F '[][{}]' '{print $2}' | head -n 1)
 if [ ! -z "$ipset_id" ]; then
     while uci -q delete firewall.@ipset[$ipset_id]; do :; done
@@ -47,6 +46,30 @@ fi
 uci commit firewall
 /etc/init.d/firewall restart
 
+echo "Чистим nftables (nftset) — если используется"
+if command -v nft &> /dev/null; then
+    for setname in vpn_domains vpn_domains_internal vpn_subnet; do
+        if nft list sets 2>/dev/null | grep -q "$setname"; then
+            echo "Удаляем nftset: $setname"
+            nft delete set inet fw4 "$setname" 2>/dev/null
+            nft delete set filter "$setname" 2>/dev/null
+            nft delete set ip fw4 "$setname" 2>/dev/null
+        fi
+    done
+
+    # Удаляем правила, помеченные комментарием mark_domains / mark_subnet
+    nft -a list ruleset 2>/dev/null | grep -E 'comment "(mark_domains|mark_subnet)"' | while read -r line; do
+        handle=$(echo "$line" | grep -o 'handle [0-9]\+' | awk '{print $2}')
+        chain=$(echo "$line" | grep -oP 'chain \K\w+')
+        if [ -n "$handle" ] && [ -n "$chain" ]; then
+            echo "Удаляем правило nftables: chain $chain, handle $handle"
+            nft delete rule inet fw4 "$chain" handle "$handle" 2>/dev/null
+        fi
+    done
+else
+    echo "nftables не найден, пропускаем"
+fi
+
 echo "Чистим сеть"
 sed -i '/99 vpn/d' /etc/iproute2/rt_tables
 
@@ -67,7 +90,7 @@ uci commit network
 
 echo "Проверяем Dnsmasq"
 if uci show dhcp | grep -q ipset; then
-    echo "В dnsmasq (/etc/config/dhcp) заданы домены. Нужные из них сохраните, остальные удалите вместе с ipset"
+    echo "В dnsmasq (/etc/config/dhcp) заданы домены. Нужные из них сохраните, остальные удалите вместе с ipset/nftset"
 fi
 
 echo "Все туннели, прокси, зоны и forwarding к ним оставляем на месте, они вам не помешают и скорее пригодятся"
