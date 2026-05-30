@@ -476,6 +476,7 @@ add_nftset() {
 
     # Создаём nft набор
     nft add set inet fw4 vpn_domains '{ type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null
+	nft add set inet fw4 vpn_domains_internal '{ type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null
 
     # Проверяем, что dnsmasq-full поддерживает nftset
     if ! dnsmasq -v | grep -q nftset; then
@@ -852,7 +853,8 @@ add_internal_wg() {
         printf "\033[32;1mCreate set\033[0m\n"
         uci add firewall ipset
         uci set firewall.@ipset[-1].name='vpn_domains_internal'
-        uci set firewall.@ipset[-1].match='dst_net'
+        uci set firewall.@ipset[-1].match='dest_ip'
+        uci set firewall.@ipset[-1].family='inet'
         uci commit firewall
     fi
 
@@ -873,18 +875,19 @@ add_internal_wg() {
         uci commit firewall
     fi
 
-    if uci show dhcp | grep -q "@ipset.*name='vpn_domains_internal'"; then
+    if uci show dhcp | grep -q "@nftset.*name='vpn_domains_internal'"; then
         printf "\033[32;1mDomain on vpn_domains_internal already exist\033[0m\n"
     else
         printf "\033[32;1mCreate domain for vpn_domains_internal\033[0m\n"
-        uci add dhcp ipset
-        uci add_list dhcp.@ipset[-1].name='vpn_domains_internal'
-        uci add_list dhcp.@ipset[-1].domain='youtube.com'
-        uci add_list dhcp.@ipset[-1].domain='googlevideo.com'
-        uci add_list dhcp.@ipset[-1].domain='youtubekids.com'
-        uci add_list dhcp.@ipset[-1].domain='googleapis.com'
-        uci add_list dhcp.@ipset[-1].domain='ytimg.com'
-        uci add_list dhcp.@ipset[-1].domain='ggpht.com'
+        uci add dhcp nftset
+        uci set dhcp.@nftset[-1].name='vpn_domains_internal'
+        uci set dhcp.@nftset[-1].table_family='inet'
+        uci add_list dhcp.@nftset[-1].domain='youtube.com'
+        uci add_list dhcp.@nftset[-1].domain='googlevideo.com'
+        uci add_list dhcp.@nftset[-1].domain='youtubekids.com'
+        uci add_list dhcp.@nftset[-1].domain='googleapis.com'
+        uci add_list dhcp.@nftset[-1].domain='ytimg.com'
+        uci add_list dhcp.@nftset[-1].domain='ggpht.com'
         uci commit dhcp
     fi
 
