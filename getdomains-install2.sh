@@ -378,26 +378,30 @@ show_manual() {
 }
 
 add_set() {
-    if uci show firewall | grep -q "@ipset.*name='vpn_domains'"; then
-        printf "\033[32;1mSet already exist\033[0m\n"
+    # Для 25.12 мы используем nftset напрямую через конфиг dnsmasq/dhcp
+    # Это избавляет от зависимости от старых ipset-структур внутри firewall
+    if uci show dhcp | grep -q "vpn_domains"; then
+        printf "\033[32;1mNFTSet for vpn_domains already exist\033[0m\n"
     else
-        printf "\033[32;1mCreate set\033[0m\n"
-        uci add firewall ipset
-        uci set firewall.@ipset[-1].name='vpn_domains'
-        uci set firewall.@ipset[-1].match='dst_net'
-        uci commit firewall
+        printf "\033[32;1mCreate nftset in dhcp config\033[0m\n"
+        uci add dhcp nftset
+        # Нативный синтаксис для 25.12: тип#семейство#таблица#имя_сета
+        uci set dhcp.@nftset[-1].nftset='4#inet#fw4#vpn_domains'
+        uci commit dhcp
     fi
+
+    # Правило в firewall по-прежнему нужно для маркировки трафика
     if uci show firewall | grep -q "@rule.*name='mark_domains'"; then
         printf "\033[32;1mRule for set already exist\033[0m\n"
     else
         printf "\033[32;1mCreate rule set\033[0m\n"
         uci add firewall rule
-        uci set firewall.@rule[-1]=rule
         uci set firewall.@rule[-1].name='mark_domains'
         uci set firewall.@rule[-1].src='lan'
         uci set firewall.@rule[-1].dest='*'
         uci set firewall.@rule[-1].proto='all'
-        uci set firewall.@rule[-1].ipset='vpn_domains'
+        # В 25.12 используем имя сэта, которое понимает nftables
+        uci set firewall.@rule[-1].ipset='vpn_domains' 
         uci set firewall.@rule[-1].set_mark='0x1'
         uci set firewall.@rule[-1].target='MARK'
         uci set firewall.@rule[-1].family='ipv4'
