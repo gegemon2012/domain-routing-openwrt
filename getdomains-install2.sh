@@ -471,23 +471,31 @@ show_manual() {
     fi
 }
 
-add_nftset() {
-    printf "\033[32;1mConfiguring nftset for domain routing\033[0m\n"
-
-    # Создаём nft набор
-    nft add set inet fw4 vpn_domains '{ type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null
-	nft add set inet fw4 vpn_domains_internal '{ type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null
-
-    # Проверяем, что dnsmasq-full поддерживает nftset
-    if ! dnsmasq -v | grep -q nftset; then
-        printf "\033[31;1mYour dnsmasq does not support nftset. Cannot continue.\033[0m\n"
-        exit 1
+add_set() {
+    if uci show firewall | grep -q "@ipset.*name='vpn_domains'"; then
+        printf "\033[32;1mSet already exist\033[0m\n"
+    else
+        printf "\033[32;1mCreate set\033[0m\n"
+        uci add firewall ipset
+        uci set firewall.@ipset[-1].name='vpn_domains'
+        uci set firewall.@ipset[-1].match='dst_net'
+        uci commit
     fi
-
-    # Убедимся, что dnsmasq читает /tmp/dnsmasq.d
-    if ! uci get dhcp.@dnsmasq[0].confdir | grep -q /tmp/dnsmasq.d; then
-        uci set dhcp.@dnsmasq[0].confdir='/tmp/dnsmasq.d'
-        uci commit dhcp
+    if uci show firewall | grep -q "@rule.*name='mark_domains'"; then
+        printf "\033[32;1mRule for set already exist\033[0m\n"
+    else
+        printf "\033[32;1mCreate rule set\033[0m\n"
+        uci add firewall rule
+        uci set firewall.@rule[-1]=rule
+        uci set firewall.@rule[-1].name='mark_domains'
+        uci set firewall.@rule[-1].src='lan'
+        uci set firewall.@rule[-1].dest='*'
+        uci set firewall.@rule[-1].proto='all'
+        uci set firewall.@rule[-1].ipset='vpn_domains'
+        uci set firewall.@rule[-1].set_mark='0x1'
+        uci set firewall.@rule[-1].target='MARK'
+        uci set firewall.@rule[-1].family='ipv4'
+        uci commit
     fi
 }
 
@@ -853,8 +861,7 @@ add_internal_wg() {
         printf "\033[32;1mCreate set\033[0m\n"
         uci add firewall ipset
         uci set firewall.@ipset[-1].name='vpn_domains_internal'
-        uci set firewall.@ipset[-1].match='dest_ip'
-        uci set firewall.@ipset[-1].family='inet'
+        uci set firewall.@ipset[-1].match='dst_net'
         uci commit firewall
     fi
 
@@ -875,13 +882,12 @@ add_internal_wg() {
         uci commit firewall
     fi
 
-    if uci show dhcp | grep -q "@nftset.*name='vpn_domains_internal'"; then
+    if uci show dhcp | grep -q "@nftset.*nftset='4#inet#fw4#vpn_domains_internal'"; then
         printf "\033[32;1mDomain on vpn_domains_internal already exist\033[0m\n"
     else
-        printf "\033[32;1mCreate domain for vpn_domains_internal\033[0m\n"
+        printf "\033[32;1mCreate domain for vpn_domains_internal (nftset)\033[0m\n"
         uci add dhcp nftset
-        uci set dhcp.@nftset[-1].name='vpn_domains_internal'
-        uci set dhcp.@nftset[-1].table_family='inet'
+        uci add_list dhcp.@nftset[-1].nftset='4#inet#fw4#vpn_domains_internal'
         uci add_list dhcp.@nftset[-1].domain='youtube.com'
         uci add_list dhcp.@nftset[-1].domain='googlevideo.com'
         uci add_list dhcp.@nftset[-1].domain='youtubekids.com'
@@ -900,7 +906,6 @@ add_internal_wg() {
 }
 
 install_awg_packages() {
-    # Получение pkgarch с наибольшим приоритетом
     PKGARCH=$(opkg print-architecture | awk 'BEGIN {max=0} {if ($3 > max) {max = $3; arch = $2}} END {print arch}')
 
     TARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 1)
@@ -995,8 +1000,9 @@ printf "\033[34;1mVersion: $OPENWRT_RELEASE\033[0m\n"
 
 VERSION_ID=$(echo $VERSION | awk -F. '{print $1}')
 
-if [ "$VERSION_ID" -ne 23 ] && [ "$VERSION_ID" -ne 24 ]; then
-    printf "\033[31;1mScript only support OpenWrt 23.05 and 24.10\033[0m\n"
+# UPDATE: Allow OpenWrt 25.12.X version branch
+if [ "$VERSION_ID" -ne 23 ] && [ "$VERSION_ID" -ne 24 ] && [ "$VERSION_ID" -ne 25 ]; then
+    printf "\033[31;1mScript only support OpenWrt 23.05, 24.10 and 25.12.X\033[0m\n"
     echo "For OpenWrt 21.02 and 22.03 you can:"
     echo "1) Use ansible https://github.com/itdoginfo/domain-routing-openwrt"
     echo "2) Configure manually. Old manual: https://itdog.info/tochechnaya-marshrutizaciya-na-routere-s-openwrt-wireguard-i-dnscrypt/"
@@ -1017,7 +1023,7 @@ add_zone
 
 show_manual
 
-add_nftset
+add_set
 
 dnsmasqfull
 
@@ -1026,6 +1032,16 @@ dnsmasqconfdir
 add_dns_resolver
 
 add_getdomains
+
+printf "\033[32;1mConfiguring recursive DNS to 9.9.9.9...\033[0m\n"
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='9.9.9.9'
+uci commit network
+
+printf "\033[32;1mApplying ntp-dot-allow and DNSSEC NTP Fix...\033[0m\n"
+uci set dhcp.@dnsmasq[0].dnssec_no_timecheck='1'
+uci commit dhcp
 
 printf "\033[32;1mRestart network\033[0m\n"
 /etc/init.d/network restart
