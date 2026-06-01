@@ -1,16 +1,16 @@
 #!/bin/sh
 
-# Умная функция установки пакетов (OpenWrt 25.x)
+# --- Новая система пакетов (APK для OpenWrt 25.x) ---
 install_pkg() {
     local package=$1
-    if opkg list-installed | grep -q "^$package\b"; then
+    if apk info -e "$package" >/dev/null 2>&1; then
         printf "\033[32;1m%s already installed\033[0m\n" "$package"
     else
         printf "\033[32;1mInstalling %s...\033[0m\n" "$package"
-        # Обновляем списки пакетов только один раз за запуск скрипта
-        [ -z "$PKG_UPDATED" ] && { opkg update >/dev/null 2>&1; PKG_UPDATED=1; }
+        # Обновляем кэш apk только один раз
+        [ -z "$PKG_UPDATED" ] && { apk update >/dev/null 2>&1; PKG_UPDATED=1; }
         
-        if opkg install "$package"; then
+        if apk add "$package"; then
             printf "\033[32;1m%s was successfully installed\033[0m\n" "$package"
         else
             printf "\033[31;1mError: failed to install %s. Check internet or repo.\033[0m\n" "$package"
@@ -21,7 +21,10 @@ install_pkg() {
 
 check_repo() {
     printf "\033[32;1mChecking OpenWrt repo availability...\033[0m\n"
-    opkg update | grep -q "Failed to download" && printf "\033[31;1mopkg failed. Check internet or date. Command for force ntp sync: ntpd -p ptbtime1.ptb.de\033[0m\n" && exit 1
+    if ! apk update >/dev/null 2>&1; then
+        printf "\033[31;1mapk update failed. Check internet or date. Command for force ntp sync: ntpd -p ptbtime1.ptb.de\033[0m\n"
+        exit 1
+    fi
 }
 
 route_vpn () {
@@ -264,9 +267,9 @@ EOF
 }
 
 dnsmasqfull() {
-    # OpenWrt 25.x корректно обрабатывает замену на dnsmasq-full через opkg
     install_pkg "dnsmasq-full"
-    [ -f /etc/config/dhcp-opkg ] && cp /etc/config/dhcp /etc/config/dhcp-old && mv /etc/config/dhcp-opkg /etc/config/dhcp
+    # apk сохраняет старые конфиги с расширением .apk-new
+    [ -f /etc/config/dhcp.apk-new ] && cp /etc/config/dhcp /etc/config/dhcp-old && mv /etc/config/dhcp.apk-new /etc/config/dhcp
 }
 
 dnsmasqconfdir() {
@@ -722,26 +725,36 @@ add_internal_wg() {
     exit 0
 }
 
-# Компактная установка модулей Amnezia
+# Адаптировано для установки .apk пакетов на OpenWrt 25.x
 install_awg_packages() {
-    PKGARCH=$(opkg print-architecture | awk 'BEGIN {max=0} {if ($3 > max) {max = $3; arch = $2}} END {print arch}')
+    source /etc/os-release
+    PKGARCH="$OPENWRT_ARCH"
     TARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 1)
     SUBTARGET=$(ubus call system board | jsonfilter -e '@.release.target' | cut -d '/' -f 2)
     VERSION=$(ubus call system board | jsonfilter -e '@.release.version')
-    PKGPOSTFIX="_v${VERSION}_${PKGARCH}_${TARGET}_${SUBTARGET}.ipk"
+    
+    # Репозиторий перешел на расширение .apk
+    PKGPOSTFIX="_v${VERSION}_${PKGARCH}_${TARGET}_${SUBTARGET}.apk"
     BASE_URL="https://github.com/Slava-Shchipunov/awg-openwrt/releases/download/v${VERSION}/"
     AWG_DIR="/tmp/amneziawg"
     
     mkdir -p "$AWG_DIR"
 
     for pkg in amneziawg-tools kmod-amneziawg luci-proto-amneziawg; do
-        if opkg list-installed | grep -q "^$pkg\b"; then
+        if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg already installed"
         else
             echo "Downloading $pkg..."
-            curl -L -o "$AWG_DIR/${pkg}${PKGPOSTFIX}" "${BASE_URL}${pkg}${PKGPOSTFIX}" || { echo "Error downloading $pkg"; exit 1; }
+            if ! curl -L -f -o "$AWG_DIR/${pkg}${PKGPOSTFIX}" "${BASE_URL}${pkg}${PKGPOSTFIX}"; then
+                echo "Error downloading $pkg"
+                exit 1
+            fi
             echo "Installing $pkg..."
-            opkg install "$AWG_DIR/${pkg}${PKGPOSTFIX}" || { echo "Error installing $pkg"; exit 1; }
+            # Установка сторонних модулей требует флага --allow-untrusted
+            if ! apk add --allow-untrusted "$AWG_DIR/${pkg}${PKGPOSTFIX}"; then
+                echo "Error installing $pkg"
+                exit 1
+            fi
         fi
     done
     rm -rf "$AWG_DIR"
@@ -755,7 +768,6 @@ printf "\033[34;1mVersion: $OPENWRT_RELEASE\033[0m\n"
 
 VERSION_ID=$(echo $VERSION | awk -F. '{print $1}')
 
-# Исключительно для 25-й ветки. Отсекаем всё, что ниже
 if [ "$VERSION_ID" -ne 25 ]; then
     printf "\033[31;1mScript strictly supports OpenWrt 25.12.X only. Legacy versions are blocked.\033[0m\n"
     exit 1
