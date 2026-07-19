@@ -35,9 +35,9 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
 
-# Скрипт для установки Get domains AWG 2.0 (25.12.0+, nftset)
+# Скрипт для установки гостевого WIFI 5g
 ```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install2.sh)
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi_5g.sh)
 ```
 
 # Скрипт для удаления Get domains
