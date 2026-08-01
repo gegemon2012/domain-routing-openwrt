@@ -34,9 +34,11 @@ remove_guest_network() {
 setup_guest_network() {
     echo "Настройка гостевых сетей..."
 
-    # 1. Сетевой интерфейс (общий для 2.4G и 5G)
+    # 1. Сетевой интерфейс (общий мост для 2.4G и 5G)
     uci set network.guest=interface
     uci set network.guest.proto='static'
+    uci set network.guest.device='br-guest'      # Создаем виртуальный мост br-guest
+    uci set network.guest.type='bridge'          # Объявляем его как bridge
     uci set network.guest.ipaddr='192.168.2.1'
     uci set network.guest.netmask='255.255.255.0'
 
