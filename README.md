@@ -35,9 +35,9 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/getdomains-install1.sh)
 ```
 
-# Скрипт для установки и/или удаления гостевого WIFI 5g
+# Скрипт для установки и/или удаления гостевого WIFI
 ```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi_5g.sh)
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi.sh)
 ```
 
 # Скрипт для удаления Get domains
