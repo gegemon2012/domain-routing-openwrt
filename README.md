@@ -36,8 +36,13 @@ sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-open
 ```
 
 # Скрипт для установки и/или удаления гостевого WIFI
+Установка:
 ```
-sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi.sh)
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi.sh) start
+```
+Удаление:
+```
+sh <(wget -O - https://raw.githubusercontent.com/gegemon2012/domain-routing-openwrt/refs/heads/master/guest_wifi.sh) remove
 ```
 
 # Скрипт для удаления Get domains
