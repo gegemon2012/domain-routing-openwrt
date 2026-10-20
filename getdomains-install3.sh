@@ -276,12 +276,12 @@ EOF
         read -r -p "Enter Jmax value (from [Interface]):"$'\n' AWG_JMAX
         read -r -p "Enter S1 value (from [Interface]):"$'\n' AWG_S1
         read -r -p "Enter S2 value (from [Interface]):"$'\n' AWG_S2
+		read -r -p "Enter S3 value (from [Interface]):"$'\n' AWG_S3
+        read -r -p "Enter S4 value (from [Interface]):"$'\n' AWG_S4
         read -r -p "Enter H1 value (from [Interface]):"$'\n' AWG_H1
         read -r -p "Enter H2 value (from [Interface]):"$'\n' AWG_H2
         read -r -p "Enter H3 value (from [Interface]):"$'\n' AWG_H3
         read -r -p "Enter H4 value (from [Interface]):"$'\n' AWG_H4
-        read -r -p "Enter S3 value (from [Interface]):"$'\n' AWG_S3
-        read -r -p "Enter S4 value (from [Interface]):"$'\n' AWG_S4
         read -r -p "Enter I1 value (from [Interface]):"$'\n' AWG_I1
         read -r -p "Enter I2 value (from [Interface]):"$'\n' AWG_I2
         read -r -p "Enter I3 value (from [Interface]):"$'\n' AWG_I3
@@ -299,12 +299,12 @@ EOF
         uci set network.awg0.awg_jmax=$AWG_JMAX
         uci set network.awg0.awg_s1=$AWG_S1
         uci set network.awg0.awg_s2=$AWG_S2
+		uci set network.awg0.awg_s3=$AWG_S3
+        uci set network.awg0.awg_s4=$AWG_S4
         uci set network.awg0.awg_h1=$AWG_H1
         uci set network.awg0.awg_h2=$AWG_H2
         uci set network.awg0.awg_h3=$AWG_H3
         uci set network.awg0.awg_h4=$AWG_H4
-        uci set network.awg0.awg_s3=$AWG_S3
-        uci set network.awg0.awg_s4=$AWG_S4
         uci set network.awg0.awg_i1=$AWG_I1
         uci set network.awg0.awg_i2=$AWG_I2
         uci set network.awg0.awg_i3=$AWG_I3
@@ -753,12 +753,12 @@ add_internal_wg() {
         read -r -p "Enter Jmax value (from [Interface]):"$'\n' AWG_JMAX
         read -r -p "Enter S1 value (from [Interface]):"$'\n' AWG_S1
         read -r -p "Enter S2 value (from [Interface]):"$'\n' AWG_S2
+		read -r -p "Enter S3 value (from [Interface]):"$'\n' AWG_S3
+        read -r -p "Enter S4 value (from [Interface]):"$'\n' AWG_S4
         read -r -p "Enter H1 value (from [Interface]):"$'\n' AWG_H1
         read -r -p "Enter H2 value (from [Interface]):"$'\n' AWG_H2
         read -r -p "Enter H3 value (from [Interface]):"$'\n' AWG_H3
         read -r -p "Enter H4 value (from [Interface]):"$'\n' AWG_H4
-        read -r -p "Enter S3 value (from [Interface]):"$'\n' AWG_S3
-        read -r -p "Enter S4 value (from [Interface]):"$'\n' AWG_S4
         read -r -p "Enter I1 value (from [Interface]):"$'\n' AWG_I1
         read -r -p "Enter I2 value (from [Interface]):"$'\n' AWG_I2
         read -r -p "Enter I3 value (from [Interface]):"$'\n' AWG_I3
@@ -778,12 +778,12 @@ add_internal_wg() {
         uci set network.${INTERFACE_NAME}.awg_jmax=$AWG_JMAX
         uci set network.${INTERFACE_NAME}.awg_s1=$AWG_S1
         uci set network.${INTERFACE_NAME}.awg_s2=$AWG_S2
+		uci set network.${INTERFACE_NAME}.awg_s3=$AWG_S3
+        uci set network.${INTERFACE_NAME}.awg_s4=$AWG_S4
         uci set network.${INTERFACE_NAME}.awg_h1=$AWG_H1
         uci set network.${INTERFACE_NAME}.awg_h2=$AWG_H2
         uci set network.${INTERFACE_NAME}.awg_h3=$AWG_H3
         uci set network.${INTERFACE_NAME}.awg_h4=$AWG_H4
-        uci set network.${INTERFACE_NAME}.awg_s3=$AWG_S3
-        uci set network.${INTERFACE_NAME}.awg_s4=$AWG_S4
         uci set network.${INTERFACE_NAME}.awg_i1=$AWG_I1
         uci set network.${INTERFACE_NAME}.awg_i2=$AWG_I2
         uci set network.${INTERFACE_NAME}.awg_i3=$AWG_I3
